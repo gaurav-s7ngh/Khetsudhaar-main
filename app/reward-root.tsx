@@ -28,7 +28,6 @@ import Svg, {
 } from 'react-native-svg';
 
 // --- Import SVG Assets ---
-// (Make sure these files are NOT empty in your assets/images folder)
 import Checkmark from '../assets/images/check.svg';
 import CoinIcon from '../assets/images/coin.svg';
 import FertilizerIcon from '../assets/images/fertilizer.svg';
@@ -42,7 +41,6 @@ const PIXEL_FONT = 'monospace';
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 // --- Reward data ---
-// We render this from bottom-to-top, so the list is visually "reversed".
 const REWARD_DATA = [
   {
     id: 1,
@@ -50,7 +48,7 @@ const REWARD_DATA = [
     points: '1000',
     text: '3% OFF RATION',
     isUnlocked: true,
-    isCurrent: false, // Node 3 is now the "current" one
+    isCurrent: false, 
     position: { top: 1020, left: '60%' },
   },
   {
@@ -68,7 +66,7 @@ const REWARD_DATA = [
     points: '5000',
     text: '5% OFF RATION',
     isUnlocked: true,
-    isCurrent: true, // This is the new "current" node
+    isCurrent: true, 
     position: { top: 660, left: '65%' },
   },
   {
@@ -109,7 +107,7 @@ const VINE_PATH =
   'S 150 50, 150 0'; // Straighten out at the top
 
 // --- Path data for animations ---
-const VINE_LENGTH = 1800; // Estimated total length of VINE_PATH
+const VINE_LENGTH = 1800; 
 const TOTAL_Y_HEIGHT = 1200;
 
 /**
@@ -153,8 +151,9 @@ const RewardNode = ({
   const scale = useSharedValue(0.8);
 
   React.useEffect(() => {
-// [FIX] Start nodes after 500ms, and stagger them 300ms apart
-    const animationDelay = 300 * (REWARD_DATA.length - 1 - index) + 500;    opacity.value = withDelay(
+    // Animate from bottom (index 0) to top
+    const animationDelay = 300 * index + 500; 
+    opacity.value = withDelay(
       animationDelay,
       withTiming(1, { duration: 400 })
     );
@@ -192,13 +191,12 @@ const RewardNode = ({
       }),
     };
   });
-  // ---------------------------------
 
   const nodeContainerStyle = [
     styles.node,
-    { top: position.top }, // <-- [FIX] Removed 'left: position.left'
-    isLeft ? styles.nodeLeft : styles.nodeRight, // <-- These styles will now control horizontal position
-    animatedNodeStyle, // Apply combined animations
+    { top: position.top },
+    isLeft ? styles.nodeLeft : styles.nodeRight,
+    animatedNodeStyle, 
   ];
 
   const iconContainerStyle = [
@@ -284,27 +282,28 @@ export default function RewardRootScreen() {
   const lessonsCompleted = REWARD_DATA.filter(r => r.isUnlocked).length;
   const rewardsCollected = REWARD_DATA.filter(r => r.isUnlocked).length;
 
-  // --- DYNAMIC GRADIENT LOGIC (FIXED) ---
-  const allUnlocked = REWARD_DATA.every(n => n.isUnlocked);
-  const allLocked = !REWARD_DATA.some(n => n.isUnlocked);
-  let unlockRatio = 0;
+  // --- DYNAMIC GRADIENT LOGIC ---
+  // We want the vine to be GREEN only up to the highest (visually top-most) CLAIMED node.
+  
+  // 1. Get all unlocked nodes
+  const unlockedNodes = REWARD_DATA.filter(n => n.isUnlocked);
+  
+  // 2. Find the smallest 'top' value among them (Smallest Y = Highest on screen)
+  //    Default to TOTAL_Y_HEIGHT (bottom) if nothing is unlocked.
+  let highestUnlockedY = TOTAL_Y_HEIGHT;
 
-  if (allUnlocked) {
-    unlockRatio = 1; // 100% green
-  } else if (!allLocked) {
-    // Find the *first* locked node (which is the one highest up the screen)
-    const firstLockedNode = REWARD_DATA.find(node => !node.isUnlocked);
-    // If we found one, its Y-position is the cutoff point
-    const unlockYCoord = firstLockedNode
-      ? firstLockedNode.position.top
-      : 0; // 0 is top
-    // Calculate the ratio of the vine *from the bottom* that should be green
-    unlockRatio = (TOTAL_Y_HEIGHT - unlockYCoord) / TOTAL_Y_HEIGHT;
+  if (unlockedNodes.length > 0) {
+    highestUnlockedY = Math.min(...unlockedNodes.map(n => n.position.top));
   }
-  // This is the percentage offset for the SVG gradient
-  // It's (1 - ratio) because SVG gradients are 0 (top) to 100 (bottom)
+
+  // 3. Calculate the ratio of the vine that should be green
+  //    If highest unlocked is at Y=600 and Total is 1200, ratio is 0.5 (50% green from bottom)
+  const unlockRatio = (TOTAL_Y_HEIGHT - highestUnlockedY) / TOTAL_Y_HEIGHT;
+  
+  // 4. Convert to SVG Offset percentage
+  //    SVG Gradients run Top (0%) to Bottom (100%).
+  //    If we want the bottom 50% to be green, the transition happens at 50% (1 - 0.5).
   const UNLOCK_GRADIENT_OFFSET = `${(1 - unlockRatio) * 100}%`;
-  // --- END DYNAMIC GRADIENT LOGIC ---
 
   // --- Animation for Vine Growth ---
   const animatedStrokeDashoffset = useSharedValue(VINE_LENGTH);
@@ -312,7 +311,7 @@ export default function RewardRootScreen() {
   React.useEffect(() => {
     // Animate the "growing" vine
     animatedStrokeDashoffset.value = withTiming(0, {
-      duration: 2500, // Slower, more majestic growth
+      duration: 2500, 
       easing: Easing.out(Easing.quad),
     });
   }, [animatedStrokeDashoffset]);
@@ -320,7 +319,6 @@ export default function RewardRootScreen() {
   const animatedVineProps = useAnimatedProps(() => ({
     strokeDashoffset: animatedStrokeDashoffset.value,
   }));
-  // ---------------------------------
 
   return (
     <SafeAreaView style={styles.container}>
@@ -330,22 +328,21 @@ export default function RewardRootScreen() {
       <View style={StyleSheet.absoluteFill}>
         <Svg height="100%" width="100%">
           <Defs>
-            {/* Dark Soil Background */}
             <LinearGradient id="soilGradient" x1="0%" y1="0%" x2="0%" y2="100%">
               <Stop offset="0" stopColor="#151718" />
               <Stop offset="1" stopColor="#3E2723" />
             </LinearGradient>
 
-            {/* --- Gradient for 3D Vine Texture --- */}
             <LinearGradient id="vineTexture" x1="0%" y1="0%" x2="100%" y2="0%">
               <Stop offset="0" stopColor="#2E7D32" stopOpacity="1" />
               <Stop offset="0.5" stopColor="#81C784" stopOpacity="1" />
               <Stop offset="1" stopColor="#2E7D32" stopOpacity="1" />
             </LinearGradient>
 
-            {/* --- Gradient for Vine PROGRESS (Green to Grey) --- */}
             <LinearGradient id="progressGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-              {/* This gradient goes from Top (0%) to Bottom (100%) */}
+              {/* Top part (Grey) -> stops at the highest unlocked node 
+                  Bottom part (Green) -> starts at the highest unlocked node
+              */}
               <Stop offset="0%" stopColor="#444" />
               <Stop offset={UNLOCK_GRADIENT_OFFSET} stopColor="#444" />
               <Stop
@@ -392,28 +389,26 @@ export default function RewardRootScreen() {
               stroke="#000"
               strokeWidth={20}
               strokeOpacity={0.3}
-              transform="translate(0, 5)" // Offset shadow
+              transform="translate(0, 5)"
             />
-            {/* NEW "GLOW" PATH
-              This sits behind the main vine to give it a "bloom" effect
-            */}
+            {/* NEW "GLOW" PATH */}
             <AnimatedPath
               d={VINE_PATH}
-              stroke="url(#progressGrad)" // Use the same progress gradient
-              strokeWidth={24} // Wider than the main vine
+              stroke="url(#progressGrad)"
+              strokeWidth={24} 
               fill="none"
-              strokeOpacity={0.4} // Semi-transparent
-              animatedProps={animatedVineProps} // Apply "growing" animation
+              strokeOpacity={0.4} 
+              animatedProps={animatedVineProps}
             />
 
             {/* Main Vine Path (Animated) */}
             <AnimatedPath
               d={VINE_PATH}
-              stroke="url(#progressGrad)" // Use the Progress Gradient
+              stroke="url(#progressGrad)"
               strokeWidth={16}
               fill="none"
               strokeDasharray={VINE_LENGTH}
-              animatedProps={animatedVineProps} // Apply "growing" animation
+              animatedProps={animatedVineProps}
             />
           </Svg>
 
@@ -436,7 +431,7 @@ export default function RewardRootScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent', // For the gradient
+    backgroundColor: 'transparent', 
   },
   scrollContainer: {
     paddingHorizontal: 16,
@@ -511,11 +506,10 @@ const styles = StyleSheet.create({
   },
   sproutContainer: {
     position: 'absolute',
-    bottom: -20, // Start from below the container
+    bottom: -20, 
     left: '50%',
-    transform: [{ translateX: -40 }], // Center the 80px icon
+    transform: [{ translateX: -40 }],
     zIndex: 10,
-    // Add a glow
     shadowColor: '#4CAF50',
     shadowRadius: 20,
     shadowOpacity: 0.7,
@@ -526,20 +520,16 @@ const styles = StyleSheet.create({
   node: {
     position: 'absolute',
     zIndex: 20,
-    // position.top and position.left applied inline
   },
  nodeLeft: {
-    // [FIX] Anchor the node's RIGHT edge to 50% (center), then push it 75px LEFT.
     right: '50%',
     marginRight: 75,
   },
   nodeRight: {
-    // [FIX] Anchor the node's LEFT edge to 50% (center), then push it 75px RIGHT.
     left: '50%',
     marginLeft: 75,
   },
   nodeCurrent: {
-    // Placeholder for animated style
   },
   nodeContent: {
     flexDirection: 'row',
@@ -564,15 +554,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 3,
     elevation: 5,
-    zIndex: 2, // Icon on top of text box edge
-    // "Glass" shine
+    zIndex: 2,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   nodeIconUnlocked: {
     backgroundColor: '#2C2C2E',
-    borderColor: 'rgba(76, 175, 80, 0.8)', // Green border
+    borderColor: 'rgba(76, 175, 80, 0.8)',
     borderWidth: 2,
-    shadowColor: '#4CAF50', // Green glow
+    shadowColor: '#4CAF50',
     shadowRadius: 10,
     shadowOpacity: 0.7,
   },
@@ -601,19 +590,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
-    zIndex: 1, // Behind icon
+    zIndex: 1,
     justifyContent: 'center',
   },
   nodeTextContainerLeft: {
     alignItems: 'flex-end',
-    paddingRight: 20, // Space for icon overlap
+    paddingRight: 20,
     paddingLeft: 10,
     borderTopLeftRadius: 8,
     borderBottomLeftRadius: 8,
   },
   nodeTextContainerRight: {
     alignItems: 'flex-start',
-    paddingLeft: 20, // Space for icon overlap
+    paddingLeft: 20,
     paddingRight: 10,
     borderTopRightRadius: 8,
     borderBottomRightRadius: 8,
@@ -637,7 +626,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   nodePointsContainerLeft: {
-    justifyContent: 'flex-end', // Aligns [1000] [Coin]
+    justifyContent: 'flex-end',
   },
   nodePoints: {
     color: '#F1B301',
@@ -663,9 +652,9 @@ const styles = StyleSheet.create({
     borderColor: '#1C1C1E',
   },
   checkmarkLeft: {
-    right: -8, // Position on the right edge of the icon
+    right: -8,
   },
   checkmarkRight: {
-    left: -8, // Position on the left edge of the icon
+    left: -8,
   },
 });

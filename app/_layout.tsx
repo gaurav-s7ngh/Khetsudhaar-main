@@ -59,24 +59,26 @@ export default function AppLayout() {
     const currentRoute = segments[0] || 'index';
 
     // --- PUBLIC ROUTES (Guest Access Allowed) ---
-    // We allow guests to see these screens without logging in
     const publicRoutes = [
       'index', 
       'language', 
       'crop', 
-      'login', 
+      'login',
+      'signup', 
       'lessons',   
       'lesson',
-      'quiz',      // <--- CRITICAL: Allows guests to take the quiz
+      'quiz', 
       'complete', 
       'reward'
     ];
 
-    const isPublicRoute = publicRoutes.includes(currentRoute);
+    // Check if current route is in publicRoutes
+    // (currentRoute as string) prevents TS error if 'signup' isn't in the type definition yet
+    const isPublicRoute = publicRoutes.includes(currentRoute as string);
 
     if (session) {
-      // User IS logged in: Redirect them out of login page
-      if (currentRoute === 'login') {
+      // User IS logged in: Redirect them out of login/signup pages
+      if (currentRoute === 'login' || (currentRoute as string) === 'signup') {
         router.replace('/lessons');
       }
     } else {
@@ -111,6 +113,7 @@ export default function AppLayout() {
         <Stack.Screen name="language" options={{ headerShown: true, headerTitle: 'LANGUAGE', headerLeft: () => null, headerRight: () => <AppHeaderRight /> }} />
         <Stack.Screen name="crop" options={{ headerShown: true, headerTitle: 'CHOOSE CROP', headerLeft: () => null, headerRight: () => <AppHeaderRight /> }} />
         <Stack.Screen name="login" options={{ headerShown: true, headerTitle: 'LOGIN', headerLeft: () => null, headerRight: () => <AppHeaderRight /> }} />
+        <Stack.Screen name="signup" options={{ headerShown: true, headerTitle: 'SIGN UP', headerLeft: () => null, headerRight: () => <AppHeaderRight /> }} />
 
         {/* Hybrid Screens */}
         <Stack.Screen name="lessons" options={{ headerShown: true, headerTitle: 'LESSONS', headerLeft: () => session ? <AppHeaderLeft /> : null, headerRight: () => <AppHeaderRight /> }} />
