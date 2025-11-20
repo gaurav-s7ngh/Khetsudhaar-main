@@ -1,6 +1,20 @@
+import { FontAwesome5 } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+
+// --- Import Supabase Client ---
+import { supabase } from '@/utils/supabase';
 
 // --- Import SVG Assets ---
 import Banana from '../assets/images/Banana.svg';
@@ -22,8 +36,80 @@ const InfoBox = ({ label, value, icon }: { label: string, value: string, icon?: 
 );
 
 export default function ProfileScreen() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<any>(null);
+
+  // Fetch profile data whenever screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const getProfile = async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          if (!session) {
+            // If no session (Guest), we can't show a profile
+            setLoading(false);
+            return;
+          }
+
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+          if (error) {
+            console.error('Error fetching profile:', error);
+          } else {
+            setProfile(data);
+          }
+        } catch (error) {
+          console.error(error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      getProfile();
+    }, [])
+  );
+
+  const handleLogout = async () => {
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          await supabase.auth.signOut();
+          // The _layout.tsx Auth Guard will automatically redirect to Login
+        },
+      },
+    ]);
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#388e3c" />
+      </View>
+    );
+  }
+
+  // Guest View (If for some reason they access this page)
+  if (!profile) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={{color:'white', marginBottom: 20}}>Please Log In to view profile</Text>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutButtonText}>GO TO LOGIN</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
-    // Use SafeAreaView as the root
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
 
@@ -38,45 +124,42 @@ export default function ProfileScreen() {
           {/* Top Section */}
           <View style={styles.cardTopRow}>
             <View style={styles.nameSection}>
-              <Text style={styles.idNumber}>293232322</Text>
-              <Text style={styles.name}>Murti C</Text>
+              {/* Display AgriStack ID if available, else 'ID: ...' */}
+              <Text style={styles.idNumber}>{profile.agristack_id || 'ID: --'}</Text>
+              <Text style={styles.name}>{profile.full_name || 'Farmer'}</Text>
             </View>
             <Banana width={64} height={64} style={styles.Banana} />
           </View>
 
-          {/* Address Section */}
+          {/* Address Section - Hardcoded for now unless added to DB */}
           <View style={styles.addressContainer}>
-            <Text style={styles.infoBoxLabel}>ADDRESS</Text>
+            <Text style={styles.infoBoxLabel}>CONTACT</Text>
             <View style={styles.addressPill}>
               <Text style={styles.addressText}>
-                45/12, Kunnumpuram Lane, Puthencruz, Kerala 682307
+                {profile.mobile_no || 'No mobile number'}
               </Text>
             </View>
           </View>
 
           {/* Info Grid */}
           <View style={styles.infoGridRow}>
-            <InfoBox label="LAND SIZE" value="50KM" icon="farm" />
-            <InfoBox label="STATE" value="KERALA" />
+            <InfoBox label="LAND SIZE" value={profile.land_size || 'N/A'} icon="farm" />
+            <InfoBox label="STATE" value={profile.state || 'N/A'} />
           </View>
           <View style={styles.infoGridRow}>
-            <InfoBox label="SEASON" value="UIRIPPU" />
-            <InfoBox label="HARVESTING" value="AUG-SEPT" />
-          </View>
-          <View style={styles.infoGridRow}>
-            <InfoBox label="RANK" value="#4" />
-            <InfoBox label="MKT PRICE(KG)" value="50" />
+            <InfoBox label="SEASON" value="KHARIF" />
+            <InfoBox label="CROP" value="BANANA" />
           </View>
 
-          {/* Points Section */}
+          {/* Points Section (Real Data) */}
           <View style={styles.pointsRow}>
             <View style={styles.pointsBox}>
               <Coin width={24} height={24} />
-              <Text style={styles.pointsText}>2000</Text>
+              <Text style={styles.pointsText}>{profile.coins || 0}</Text>
             </View>
             <View style={styles.pointsBox}>
               <LeafIcon width={24} height={24} />
-              <Text style={styles.pointsText}>8000</Text>
+              <Text style={styles.pointsText}>{profile.xp || 0}</Text>
             </View>
           </View>
         </View>
@@ -86,9 +169,16 @@ export default function ProfileScreen() {
           <SusScore width={80} height={80} style={styles.gaugeIcon} />
           <View>
             <Text style={styles.sustainabilityTitle}>SUSTAINABILITY SCORE</Text>
-            <Text style={styles.sustainabilityValue}>LOW</Text>
+            <Text style={styles.sustainabilityValue}>{profile.sustainability_score || 'LOW'}</Text>
           </View>
         </View>
+
+        {/* --- LOGOUT BUTTON --- */}
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <FontAwesome5 name="sign-out-alt" size={20} color="#FF5252" style={{marginRight: 10}} />
+          <Text style={styles.logoutButtonText}>LOGOUT</Text>
+        </TouchableOpacity>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -98,6 +188,12 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#1C1C1E',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: '#1C1C1E',
   },
   scrollContainer: {
@@ -133,12 +229,13 @@ const styles = StyleSheet.create({
   },
   idNumber: {
     color: 'white',
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
+    opacity: 0.7,
   },
   name: {
     color: 'white',
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     marginTop: 4,
   },
@@ -231,13 +328,31 @@ const styles = StyleSheet.create({
   },
   sustainabilityTitle: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
   },
   sustainabilityValue: {
     color: '#FF5252',
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     marginTop: 4,
+  },
+  // Logout Button Styles
+  logoutButton: {
+    flexDirection: 'row',
+    backgroundColor: '#2C2C2E',
+    marginTop: 30,
+    paddingVertical: 16,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FF5252',
+  },
+  logoutButtonText: {
+    color: '#FF5252',
+    fontSize: 16,
+    fontWeight: 'bold',
+    letterSpacing: 1,
   },
 });
