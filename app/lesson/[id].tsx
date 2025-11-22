@@ -30,6 +30,7 @@ interface LessonDetail {
 const fetchLessonDetail = async (idStr: string, lang: string) => {
     const lessonId = parseInt(idStr);
     
+    // Dynamic Columns
     const titleCol = `title_${lang}`;
     const descCol = `description_${lang}`;
     const contentCol = `content_${lang}`;
@@ -47,7 +48,6 @@ const fetchLessonDetail = async (idStr: string, lang: string) => {
     
     if (error) throw error;
 
-    // CAST TO 'any' TO FIX TYPESCRIPT ERROR
     const lessonRaw = lessonRawData as any;
 
     // Map to standard object
@@ -93,25 +93,53 @@ export default function LessonDetailScreen() {
 
   const handleComplete = async () => {
     if (!lesson || isCompleting || isOffline) {
-        if (isOffline) Alert.alert("Offline", "Cannot complete lessons while offline.");
+        if (isOffline) Alert.alert(t('offline_mode'), t('go_online'));
         return;
     }
     setIsCompleting(true);
     
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user.id;
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
 
-    if (userId) {
-        await supabase.from('user_lessons').insert([{ 
-            user_id: userId, 
-            lesson_id: lesson.id, 
-            completed_at: new Date().toISOString() 
-        }]);
+      if (userId) {
+          // 1. Mark Lesson as Complete
+          const { error: insertError } = await supabase.from('user_lessons').insert([{ 
+              user_id: userId, 
+              lesson_id: lesson.id, 
+              completed_at: new Date().toISOString() 
+          }]);
+
+          if (insertError) throw insertError;
+          
+          // 2. AWARD COINS & XP (THE NEW LOGIC)
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('coins, xp')
+            .eq('id', userId)
+            .single();
+
+          if (profile) {
+            const newCoins = (profile.coins || 0) + (lesson.points || 0);
+            const newXP = (profile.xp || 0) + 50; // Award 50 XP for reading the content
+
+            await supabase
+              .from('profiles')
+              .update({ coins: newCoins, xp: newXP })
+              .eq('id', userId);
+          }
+      }
+      
+      setIsCompleting(false);
+      refresh();
+      // Navigate to Quiz (where the user earns the main Quest Coin)
+      router.push({ pathname: '/quiz/[id]', params: { id: lesson.id.toString() } });
+
+    } catch (error: any) {
+      console.error("Completion Error:", error);
+      Alert.alert("Error", error.message || "Failed to save progress or award coins.");
+      setIsCompleting(false);
     }
-    
-    setIsCompleting(false);
-    refresh();
-    router.push({ pathname: '/quiz/[id]', params: { id: lesson.id.toString() } });
   };
 
   const isScreenLoading = (loading || isTransLoading) && !lesson;
@@ -125,13 +153,12 @@ export default function LessonDetailScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {isOffline && <View style={styles.offlineBanner}><Text style={styles.offlineText}>Offline Mode</Text></View>}
+        {isOffline && <View style={styles.offlineBanner}><Text style={styles.offlineText}>{t('offline_mode')}</Text></View>}
 
         <View style={styles.headerRow}>
           <Text style={styles.bigNumber}>{lesson.sequence}</Text>
           <View style={{flex: 1}}>
             <Text style={styles.headerTitle}>{lesson.title}</Text>
-            {/* FIX: Display the Description here */}
             <Text style={styles.headerDescription}>{lesson.description}</Text>
           </View>
         </View>
@@ -140,6 +167,7 @@ export default function LessonDetailScreen() {
           <FontAwesome5 name="play" size={40} color="white" />
         </View>
 
+        {/* Content Renderer */}
         <View style={styles.contentContainer}>
             {lesson.content?.replace(/\\n/g, '\n').split('\n').map((line, index) => {
                 const trimmed = line.trim();
@@ -165,7 +193,7 @@ export default function LessonDetailScreen() {
           disabled={isCompleted || isCompleting || isOffline}
         >
           <Text style={styles.actionButtonText}>
-            {isCompleting ? 'SAVING...' : isCompleted ? 'COMPLETED ✓' : isOffline ? 'GO ONLINE TO COMPLETE' : 'TAKE QUIZ'}
+            {isCompleting ? t('saving') : isCompleted ? t('completed_btn') : isOffline ? t('go_online') : t('take_quiz')}
           </Text>
         </TouchableOpacity>
       </ScrollView>

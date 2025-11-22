@@ -1,7 +1,6 @@
-import { useCachedQuery } from '@/hooks/useCachedQuery';
-import { supabase } from '@/utils/supabase';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
@@ -13,6 +12,12 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+
+import { useCachedQuery } from '@/hooks/useCachedQuery';
+import { useTranslation } from '@/hooks/useTranslation';
+import { supabase } from '@/utils/supabase';
+
+// Importing your existing Qcoin asset
 import QCoin from '../assets/images/Qcoin.svg';
 
 const PIXEL_FONT = 'monospace';
@@ -31,6 +36,7 @@ const fetchQuiz = async (id: string) => {
 export default function QuizScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{id: string}>(); 
+    const { t } = useTranslation();
     
     const { data: quizData, loading, isOffline } = useCachedQuery(
         `quest_quiz_${id}`,
@@ -44,7 +50,7 @@ export default function QuizScreen() {
     const handleSubmit = async () => {
         if (!selectedAnswer || !quizData) return;
         if (isOffline) {
-            Alert.alert("Offline", "Cannot submit results while offline.");
+            Alert.alert(t('offline_mode'), t('go_online'));
             return;
         }
         
@@ -56,11 +62,30 @@ export default function QuizScreen() {
             try {
                 const { data: { session } } = await supabase.auth.getSession();
                 if (session?.user) {
+                    const userId = session.user.id;
+
+                    // 1. Mark Quest as Done
                     await supabase.from('user_quests').insert({ 
-                        user_id: session.user.id, 
+                        user_id: userId, 
                         quest_id: quizData.id 
                     });
-                    // You might want to update profile XP/Coins here too
+
+                    // 2. AWARD XP & QUEST COINS (THE NEW LOGIC)
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('xp, quest_coins')
+                        .eq('id', userId)
+                        .single();
+
+                    if (profile) {
+                        const newXP = (profile.xp || 0) + (quizData.xp_reward || 0);
+                        const newQuestCoins = (profile.quest_coins || 0) + 1; // Award 1 quest coin for completion
+
+                        await supabase
+                            .from('profiles')
+                            .update({ xp: newXP, quest_coins: newQuestCoins })
+                            .eq('id', userId);
+                    }
                 }
             } catch (err) {
                 console.error("Save error", err);
@@ -83,22 +108,26 @@ export default function QuizScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
+            <StatusBar style="light" />
             <ScrollView contentContainerStyle={styles.scrollContainer}>
-                 {isOffline && <View style={styles.offlineBanner}><Text style={styles.offlineText}>Offline Mode (Read Only)</Text></View>}
+                 {isOffline && <View style={styles.offlineBanner}><Text style={styles.offlineText}>{t('offline_mode')}</Text></View>}
 
+                {/* Header */}
                 <View style={styles.header}>
-                    <Text style={styles.headerTitle}>KNOWLEDGE CHECK</Text>
+                    <Text style={styles.headerTitle}>{t('knowledge_check')}</Text>
                     <View style={styles.xpTag}>
                         <QCoin width={16} height={16} />
-                        <Text style={styles.xpText}>Win {quizData.xp_reward} XP</Text>
+                        <Text style={styles.xpText}>{t('win_xp').replace('{xp}', quizData.xp_reward)}</Text>
                     </View>
                 </View>
 
+                {/* Question Card */}
                 <View style={styles.questionCard}>
-                    <Text style={styles.questionLabel}>QUESTION</Text>
+                    <Text style={styles.questionLabel}>{t('question')}</Text>
                     <Text style={styles.questionText}>{quizData.quiz_question}</Text>
                 </View>
 
+                {/* Options */}
                 <View style={styles.optionsContainer}>
                     {quizData.quiz_options?.map((option: string, index: number) => {
                         const isSelected = selectedAnswer === option;
@@ -139,20 +168,22 @@ export default function QuizScreen() {
                     })}
                 </View>
 
+                {/* Result & Explanation Area */}
                 {resultState !== 'none' && (
                     <View style={[styles.resultBox, resultState === 'correct' ? styles.resultBoxSuccess : styles.resultBoxError]}>
                         <View style={{flexDirection:'row', alignItems:'center', marginBottom: 8}}>
                             <FontAwesome5 name={resultState === 'correct' ? "trophy" : "exclamation-triangle"} size={20} color="white" />
                             <Text style={styles.resultTitle}>
-                                {resultState === 'correct' ? 'EXCELLENT WORK!' : 'NOT QUITE RIGHT'}
+                                {resultState === 'correct' ? t('excellent_work') : t('not_quite_right')}
                             </Text>
                         </View>
                         <Text style={styles.explanationText}>
-                            {quizData.quiz_explanation || "Review the lesson to find the right answer."}
+                            {quizData.quiz_explanation || t('review_lesson')}
                         </Text>
                     </View>
                 )}
 
+                {/* Action Button */}
                 <View style={{height: 100}}> 
                     {(selectedAnswer || resultState !== 'none') && (
                         <TouchableOpacity 
@@ -161,7 +192,7 @@ export default function QuizScreen() {
                             disabled={isOffline}
                         >
                             <Text style={styles.actionButtonText}>
-                                {resultState === 'none' ? 'SUBMIT ANSWER' : resultState === 'correct' ? 'CLAIM REWARD' : 'TRY AGAIN'}
+                                {resultState === 'none' ? t('submit_answer') : resultState === 'correct' ? t('claim_reward') : t('try_again')}
                             </Text>
                         </TouchableOpacity>
                     )}
