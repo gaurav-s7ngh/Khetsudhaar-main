@@ -92,10 +92,15 @@ export default function LessonDetailScreen() {
   const isCompleted = data?.isCompleted;
 
   const handleComplete = async () => {
-    if (!lesson || isCompleting || isOffline) {
-        if (isOffline) Alert.alert(t('offline_mode'), t('go_online'));
-        return;
-    }
+  if (!lesson || isCompleting) return;
+
+  if (lesson.id === 2) {
+ router.push({ 
+ pathname: '/game/[id]', // MUST point to your new screen folder
+ params: { id: lesson.id.toString() } 
+});
+ return; // <--- CRITICAL: Stops the function from proceeding
+ }
     setIsCompleting(true);
     
     try {
@@ -193,8 +198,11 @@ export default function LessonDetailScreen() {
           disabled={isCompleted || isCompleting || isOffline}
         >
           <Text style={styles.actionButtonText}>
-            {isCompleting ? t('saving') : isCompleted ? t('completed_btn') : isOffline ? t('go_online') : t('take_quiz')}
-          </Text>
+           {isCompleting 
+                ? `${t('completed')} ✓` 
+                : (lesson.id === 2 ? "START FARMING" : t('take_quiz')) 
+            }
+        </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

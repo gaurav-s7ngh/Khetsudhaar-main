@@ -127,6 +127,7 @@ export default function AppLayout() {
         <Stack.Screen name="lessons" options={{ headerShown: true, headerTitle: t('lessons'), headerLeft: () => session ? <AppHeaderLeft /> : null, headerRight: () => <AppHeaderRight /> }} />
         {/* Use a function component for dynamic title in the next two screens */}
         <Stack.Screen name="lesson/[id]" options={{ headerShown: true, headerTitle: 'LESSON DETAIL', headerLeft: () => session ? <AppHeaderLeft /> : null, headerRight: () => <AppHeaderRight /> }} />
+        <Stack.Screen name="game/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="quiz/[id]" options={{ headerShown: true, headerTitle: t('take_quiz'), headerLeft: () => null, headerRight: () => <AppHeaderRight /> }} />
         <Stack.Screen name="complete/[id]" options={{ headerShown: true, headerTitle: t('completed'), headerLeft: () => null, headerRight: () => <AppHeaderRight /> }} />
         <Stack.Screen name="reward/[id]" options={{ headerShown: true, headerTitle: t('rewards'), headerLeft: () => null, headerRight: () => <AppHeaderRight /> }} />
