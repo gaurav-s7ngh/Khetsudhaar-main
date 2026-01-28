@@ -41,11 +41,13 @@ export default function RewardScreen() {
 
   const handleContinue = () => {
     if (isGuest) {
+      // Send Guest to Login (which links to Signup)
       router.replace({
         pathname: '/login',
         params: { lesson_completed: id },
       });
     } else {
+      // Logged in user goes to Dashboard
       router.replace('/dashboard'); 
     }
   };
@@ -64,7 +66,6 @@ export default function RewardScreen() {
         <View style={styles.rewardCard}>
           <Text style={styles.congratulationsText}>CONGRATULATIONS!!</Text>
           
-          {/* --- Restored Mascot Visuals --- */}
           <View style={styles.imageContainer}>
             <RewardMascot width={200} height={200} />
           </View>
@@ -85,7 +86,7 @@ export default function RewardScreen() {
 
         <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
           <Text style={styles.continueButtonText}>
-            {isGuest ? 'LOGIN TO SAVE' : 'CONTINUE'}
+            {isGuest ? 'CREATE ACCOUNT TO CLAIM' : 'CONTINUE TO DASHBOARD'}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -120,7 +121,7 @@ const styles = StyleSheet.create({
   imageContainer: { 
     width: '90%', 
     aspectRatio: 1, 
-    backgroundColor: '#D7C3A0', // <--- The tile color you liked
+    backgroundColor: '#D7C3A0',
     borderRadius: 15, 
     justifyContent: 'center', 
     alignItems: 'center', 
@@ -148,5 +149,5 @@ const styles = StyleSheet.create({
   socialIconsContainer: { flexDirection: 'row', justifyContent: 'space-around', width: '80%' },
   
   continueButton: { backgroundColor: '#388e3c', width: '100%', maxWidth: 400, paddingVertical: 18, borderRadius: 30, marginTop: 10, borderWidth: 2, borderColor: '#4CAF50' },
-  continueButtonText: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', textAlign: 'center', letterSpacing: 1 },
+  continueButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', textAlign: 'center', letterSpacing: 1 },
 });

@@ -46,7 +46,8 @@ export default function CropScreen() {
             .eq('id', session.user.id);
         }
 
-        // 3. Navigate to Step 3: First LESSON (ID: 1) - CHANGED ROUTING
+        // 3. Navigate to Step 3: First LESSON (ID: 1)
+        // CHANGED FROM QUEST DETAILS TO LESSON
         router.replace({ pathname: '/lesson/[id]', params: { id: '1' } }); 
 
       } catch (error) {

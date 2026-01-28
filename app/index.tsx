@@ -31,7 +31,8 @@ export default function Index() {
       } else if (!crop) {
         setNextScreen('/crop');     // Step 2: User hasn't chosen crop
       } else if (!rewardClaimed) {
-        // Step 3: Send to First LESSON (ID 1) - CHANGED FROM QUEST-DETAILS
+        // Step 3: Send to First LESSON (ID 1)
+        // CHANGED FROM QUEST DETAILS TO LESSON
         setNextScreen('/lesson/1'); 
       } else {
         setNextScreen('/login');    // Step 4: Finished flow, needs to login

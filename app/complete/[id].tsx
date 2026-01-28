@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 
 import { useTranslation } from '@/hooks/useTranslation';
-import { supabase } from '@/utils/supabase'; // <--- ADD THIS IMPORT
+import { supabase } from '@/utils/supabase'; // Needed for auth check
 import Checkmark from '../../assets/images/check.svg';
 import Coin from '../../assets/images/coin.svg';
 
@@ -54,7 +54,6 @@ export default function LessonCompleteScreen() {
         {/* Main Completion Card */}
         <View style={styles.card}>
           <Checkmark width={200} height={200} style={styles.checkmark} />
-          {/* --- TRANSLATION APPLIED --- */}
           <Text style={styles.completeText}>{t('completed_lesson_title')}</Text>
 
           <View style={styles.rewardContainer}>
