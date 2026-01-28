@@ -57,7 +57,8 @@ export default function AppLayout() {
   useEffect(() => {
     if (isLoading) return;
 
-    const currentRoute = segments[0] || 'index';
+    // FIX: Explicitly cast to string to fix the "no overlap" TypeScript error
+    const currentRoute = (segments[0] || 'index') as string;
 
     const publicRoutes = [
       'index', 
@@ -72,11 +73,11 @@ export default function AppLayout() {
       'reward'
     ];
 
-    const isPublicRoute = publicRoutes.includes(currentRoute as string);
+    const isPublicRoute = publicRoutes.includes(currentRoute);
 
     if (session) {
       // FIX 1: Redirect to DASHBOARD, not Lessons, to establish it as the root
-      if (currentRoute === 'login' || (currentRoute as string) === 'signup' || currentRoute === 'index') {
+      if (currentRoute === 'login' || currentRoute === 'signup' || currentRoute === 'index') {
         router.replace('/dashboard');
       }
     } else {
