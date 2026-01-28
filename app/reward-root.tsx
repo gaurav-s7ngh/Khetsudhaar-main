@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  Image,
   Modal,
   SafeAreaView,
   ScrollView,
@@ -17,7 +16,6 @@ import {
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import Animated, {
-  Easing,
   useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
@@ -47,21 +45,8 @@ import SeedsIcon from '../assets/images/seeds.svg';
 const PIXEL_FONT = 'monospace';
 const { width, height } = Dimensions.get('window');
 
-// --- Crop Image Mapping (Assets still need to be local or hosted URLs) ---
-const CROP_IMAGES: { [key: string]: any } = {
-  banana: require('../assets/images/crops/banana.png'),
-  coffee: require('../assets/images/crops/coffee.png'),
-  coconut: require('../assets/images/crops/coconut.png'),
-  rice: require('../assets/images/crops/rice.png'),
-  cardamom: require('../assets/images/crops/cardamom.png'),
-  black_pepper: require('../assets/images/crops/black_pepper.png'),
-  ginger: require('../assets/images/crops/ginger.png'),
-  cashew: require('../assets/images/crops/cashew.png'),
-};
-
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
-// --- SMOOTH VINE PATH ---
 const VINE_PATH =
   'M 150 1200 ' + 
   'C 150 1120, 220 1100, 220 1020 ' + 
@@ -74,46 +59,23 @@ const VINE_PATH =
 
 const VINE_LENGTH = 2000; 
 
-// --- FIREFLIES ---
-const FloatingParticle = ({ delay, size, x, duration }: any) => {
-  const translateY = useSharedValue(0);
-  const opacity = useSharedValue(0);
-
-  React.useEffect(() => {
-    translateY.value = withDelay(delay, withRepeat(withTiming(-height, { duration: duration, easing: Easing.linear }), -1));
-    opacity.value = withDelay(delay, withRepeat(withSequence(withTiming(0.6, { duration: duration/2 }), withTiming(0, { duration: duration/2 })), -1));
-  }, []);
-
-  const style = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-    opacity: opacity.value,
-    left: x,
-  }));
-
-  return <Animated.View style={[styles.particle, { width: size, height: size }, style]} />;
-};
-
-// --- COMPONENTS ---
-const StatBox = ({ label, value, iconName }: any) => (
-  <View style={styles.statBox}>
-    <View style={styles.statIconContainer}>
-      <FontAwesome5 name={iconName} size={14} color="#A5D6A7" />
-    </View>
-    <View>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
-    </View>
-  </View>
-);
+// --- STATIC VISUAL CONFIG (Restored from original design) ---
+const STATIC_NODES = [
+  { id: 1, cost: 1000, title: '3% OFF RATION', icon: 'ration', top: 1020, left: '65%' },
+  { id: 2, cost: 3000, title: '2% DISC SEEDS', icon: 'seeds', top: 840, left: '35%' },
+  { id: 3, cost: 5000, title: '5% OFF RATION', icon: 'ration', top: 660, left: '65%' },
+  { id: 4, cost: 6000, title: '6% OFF FERTILIZER', icon: 'fertilizer', top: 480, left: '35%' },
+  { id: 5, cost: 8000, title: '5% DISC SEEDS', icon: 'seeds', top: 300, left: '65%' },
+  { id: 6, cost: 10000, title: '10% OFF RATION', icon: 'ration', top: 120, left: '35%' },
+];
 
 const RewardNode = ({ node, index, onPress }: any) => {
-  const { icon_type, cost, title, isUnlocked, isCurrent, position_top, position_left } = node;
-  const isLeft = parseFloat(position_left || '50%') < 50;
+  const { icon, cost, title, isUnlocked, isCurrent, top, left } = node;
+  const isLeft = parseFloat(left) < 50;
 
-  // Render correct icon based on DB string
   const renderIcon = () => {
-    if (icon_type === 'seeds') return <SeedsIcon width={28} height={28} />;
-    if (icon_type === 'fertilizer') return <FertilizerIcon width={28} height={28} />;
+    if (icon === 'seeds') return <SeedsIcon width={28} height={28} />;
+    if (icon === 'fertilizer') return <FertilizerIcon width={28} height={28} />;
     return <RationIcon width={28} height={28} />;
   };
 
@@ -137,10 +99,9 @@ const RewardNode = ({ node, index, onPress }: any) => {
   }));
 
   return (
-    <Animated.View style={[styles.node, { top: position_top }, isLeft ? styles.nodeLeft : styles.nodeRight, animatedStyle]}>
+    <Animated.View style={[styles.node, { top: top }, isLeft ? styles.nodeLeft : styles.nodeRight, animatedStyle]}>
       <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
         <View style={[styles.nodeWrapper, isLeft ? styles.wrapperLeft : styles.wrapperRight]}>
-          
           <View style={[styles.textTag, isLeft ? styles.textTagLeft : styles.textTagRight]}>
              <Text style={styles.nodeTitle} numberOfLines={2}>{title}</Text>
              <View style={styles.costRow}>
@@ -148,17 +109,10 @@ const RewardNode = ({ node, index, onPress }: any) => {
                 <Text style={styles.nodeCost}>{cost}</Text>
              </View>
           </View>
-
           <View style={[styles.iconCircle, isUnlocked ? styles.iconCircleUnlocked : styles.iconCircleLocked]}>
             {isUnlocked ? renderIcon() : <FontAwesome5 name="lock" size={18} color="rgba(255,255,255,0.3)" />}
-            
-            {isUnlocked && (
-              <View style={styles.checkBadge}>
-                <Checkmark width={8} height={8} />
-              </View>
-            )}
+            {isUnlocked && <View style={styles.checkBadge}><Checkmark width={8} height={8} /></View>}
           </View>
-
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -166,12 +120,10 @@ const RewardNode = ({ node, index, onPress }: any) => {
 };
 
 export default function RewardRootScreen() {
-  const { t, isLoading: isTransLoading } = useTranslation();
-  const [rewards, setRewards] = useState<any[]>([]);
+  const { t } = useTranslation();
+  const [rewards, setRewards] = useState<any[]>(STATIC_NODES); // Default to static visual
   const [userPoints, setUserPoints] = useState(0);
-  const [collectedCount, setCollectedCount] = useState(0);
   const [userId, setUserId] = useState<string | null>(null);
-  const [selectedCrop, setSelectedCrop] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [activeReward, setActiveReward] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -186,47 +138,31 @@ export default function RewardRootScreen() {
           if (!session) { setLoading(false); return; }
           setUserId(session.user.id);
 
-          // 1. Fetch User Profile
-          const { data: profile } = await supabase.from('profiles').select('coins, selected_crop').eq('id', session.user.id).single();
-          if (profile) {
-            setUserPoints(profile.coins || 0);
-            setSelectedCrop(profile.selected_crop);
-          }
+          const { data: profile } = await supabase.from('profiles').select('coins').eq('id', session.user.id).single();
+          setUserPoints(profile?.coins || 0);
 
-          // 2. Fetch ALL Rewards from DB
-          const { data: allRewards, error: rewardsError } = await supabase
-            .from('rewards')
-            .select('*')
-            .order('id', { ascending: true });
-          
-          if (rewardsError) throw rewardsError;
-
-          // 3. Fetch Unlocked Rewards
           const { data: unlockedData } = await supabase.from('user_rewards').select('reward_id').eq('user_id', session.user.id);
           const unlockedIds = unlockedData?.map((r: any) => r.reward_id) || [];
-
-          setCollectedCount(unlockedIds.length);
-          const maxUnlockedId = Math.max(0, ...unlockedIds);
           
-          // Calculate Vine Progress based on the last unlocked reward
-          const lastUnlockedReward = allRewards?.find(r => r.id === maxUnlockedId);
-          const targetProgress = lastUnlockedReward ? lastUnlockedReward.vine_progress : 0;
+          const maxUnlockedId = Math.max(0, ...unlockedIds);
 
-          const targetOffset = VINE_LENGTH * (1 - targetProgress);
-          animatedStrokeDashoffset.value = withTiming(targetOffset, { duration: 1500, easing: Easing.out(Easing.cubic) });
-
-          // Map data for UI
-          const mappedRewards = (allRewards || []).map((r) => ({
-            ...r,
-            isUnlocked: unlockedIds.includes(r.id),
-            // It is "Current" if it is the NEXT one in line after the max unlocked
-            isCurrent: !unlockedIds.includes(r.id) && (unlockedIds.length === 0 ? r.id === allRewards[0].id : r.id === maxUnlockedId + 1)
+          // Map dynamic status onto static visual nodes
+          const mappedRewards = STATIC_NODES.map((node) => ({
+            ...node,
+            isUnlocked: unlockedIds.includes(node.id),
+            isCurrent: !unlockedIds.includes(node.id) && (unlockedIds.length === 0 ? node.id === 1 : node.id === maxUnlockedId + 1)
           }));
 
           setRewards(mappedRewards);
 
+          // Animate Vine based on progress
+          const progressStep = 1 / (STATIC_NODES.length + 1);
+          const currentProgress = unlockedIds.length * progressStep; 
+          const targetOffset = VINE_LENGTH * (1 - currentProgress);
+          animatedStrokeDashoffset.value = withTiming(targetOffset, { duration: 1500 });
+
         } catch (e) {
-          console.error("Error loading rewards:", e);
+          console.error(e);
         } finally {
           setLoading(false); 
         }
@@ -246,7 +182,7 @@ export default function RewardRootScreen() {
       return;
     }
     if (!node.isCurrent) {
-      Alert.alert(t('unlocked'), "Grow your roots step by step!"); 
+      Alert.alert(t('locked'), "Complete previous rewards first!"); 
       return;
     }
     if (userPoints < node.cost) {
@@ -254,43 +190,31 @@ export default function RewardRootScreen() {
       return;
     }
 
-    Alert.alert(t('rewards_tree_title'), `Spend ${node.cost} coins?`, [
-      { text: t('confirm'), style: "cancel" },
+    Alert.alert("Unlock Reward?", `Spend ${node.cost} coins?`, [
+      { text: "Cancel", style: "cancel" },
       {
-        text: t('confirm'), 
+        text: "Unlock", 
         onPress: async () => {
           if (!userId) return;
           
-          const newBalance = userPoints - node.cost;
-          setUserPoints(newBalance);
-          setCollectedCount(prev => prev + 1);
-          
-          // Optimistic UI Update
+          // Optimistic UI
+          setUserPoints(prev => prev - node.cost);
           setRewards(prev => prev.map(r => 
             r.id === node.id ? { ...r, isUnlocked: true, isCurrent: false } : 
             r.id === node.id + 1 ? { ...r, isCurrent: true } : r
           ));
 
-          // Grow vine
-          const targetOffset = VINE_LENGTH * (1 - node.vine_progress);
-          animatedStrokeDashoffset.value = withTiming(targetOffset, { duration: 1000 });
-
           setActiveReward(node);
           setModalVisible(true);
 
-          // DB Update
-          await supabase.from('profiles').update({ coins: newBalance }).eq('id', userId);
+          await supabase.from('profiles').update({ coins: userPoints - node.cost }).eq('id', userId);
           await supabase.from('user_rewards').insert({ user_id: userId, reward_id: node.id });
         }
       }
     ]);
   };
 
-  const CropImageSource = (selectedCrop && CROP_IMAGES[selectedCrop.toLowerCase()]) 
-    ? CROP_IMAGES[selectedCrop.toLowerCase()] 
-    : CROP_IMAGES['banana']; 
-
-  if (loading || isTransLoading) return <SafeAreaView style={styles.container}><ActivityIndicator size="large" color="#4CAF50" /></SafeAreaView>;
+  if (loading) return <SafeAreaView style={styles.container}><ActivityIndicator size="large" color="#4CAF50" /></SafeAreaView>;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -305,66 +229,34 @@ export default function RewardRootScreen() {
           </Defs>
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#bgGrad)" />
         </Svg>
-        <FloatingParticle delay={0} size={4} x="20%" duration={8000} />
-        <FloatingParticle delay={2000} size={6} x="60%" duration={12000} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        <View style={styles.statsContainer}>
-          <StatBox label={t('available_coins')} value={String(userPoints)} iconName="coins" />
-          <StatBox label={t('unlocked')} value={String(collectedCount)} iconName="gift" />
-        </View>
-        
         <Text style={styles.rewardRootTitle}>{t('rewards_tree_title')}</Text>
         
         <View style={styles.rootContainer}>
           <Svg style={styles.vineSvg} height={1200} width={300}>
-            <Path 
-              d={VINE_PATH} 
-              stroke="#3e2723" 
-              strokeWidth={16} 
-              fill="none"
-              strokeLinecap="round"
-              strokeOpacity={0.5}
-            />
-            <AnimatedPath 
-              d={VINE_PATH} 
-              stroke="#4CAF50" 
-              strokeWidth={10} 
-              fill="none"
-              strokeLinecap="round"
-              strokeDasharray={VINE_LENGTH}
-              animatedProps={animatedVineProps} 
-            />
+            <Path d={VINE_PATH} stroke="#3e2723" strokeWidth={16} fill="none" strokeLinecap="round" strokeOpacity={0.5} />
+            <AnimatedPath d={VINE_PATH} stroke="#4CAF50" strokeWidth={10} fill="none" strokeLinecap="round" strokeDasharray={VINE_LENGTH} animatedProps={animatedVineProps} />
           </Svg>
           
-          <View style={styles.sproutContainer}>
-            <View style={styles.sproutGlow} />
-            <Image source={CropImageSource} style={styles.sproutImage} />
-          </View>
-
           {rewards.map((node, index) => (
             <RewardNode key={node.id} node={node} index={index} onPress={() => handleNodePress(node)} />
           ))}
         </View>
       </ScrollView>
 
-      {/* MODAL */}
       <Modal animationType="fade" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalView}>
             <Text style={styles.modalTitle}>REWARD UNLOCKED!</Text>
-            {activeReward && (
-              <>
-                <Text style={styles.modalRewardName}>{activeReward.title}</Text>
-                <View style={styles.qrBox}>
-                  <QRCode value={`KHET_REWARD_${activeReward.id}_USER_${userId}`} size={180} />
-                </View>
-                <Text style={styles.scanInstruction}>{t('scan_at_store')}</Text>
-              </>
-            )}
+            <Text style={styles.modalRewardName}>{activeReward?.title}</Text>
+            <View style={styles.qrBox}>
+              <QRCode value={`REWARD:${activeReward?.id}:${userId}`} size={180} />
+            </View>
+            <Text style={styles.scanInstruction}>{t('scan_at_store')}</Text>
             <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
-              <Text style={styles.closeButtonText}>{t('confirm')}</Text>
+              <Text style={styles.closeButtonText}>CLOSE</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -377,25 +269,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1b2e15' },
   scrollContainer: { paddingHorizontal: 16, paddingBottom: 60, paddingTop: 24 },
   
-  // Stats
-  statsContainer: { flexDirection: 'row', gap: 12, marginBottom: 20 },
-  statBox: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  statIconContainer: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
-  statLabel: { color: '#AAA', fontFamily: PIXEL_FONT, fontSize: 9, letterSpacing: 0.5 },
-  statValue: { color: '#E8F5E9', fontFamily: PIXEL_FONT, fontSize: 18, fontWeight: 'bold' },
-
-  rewardRootTitle: { color: '#A5D6A7', fontFamily: PIXEL_FONT, fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginTop: 10, marginBottom: 30, letterSpacing: 2 },
+  rewardRootTitle: { color: '#A5D6A7', fontFamily: PIXEL_FONT, fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 30, letterSpacing: 2 },
   
   rootContainer: { position: 'relative', width: '100%', height: 1200, alignItems: 'center' },
   vineSvg: { position: 'absolute', top: 0, left: '50%', transform: [{ translateX: -150 }] },
   
-  sproutContainer: { position: 'absolute', bottom: -15, left: '50%', transform: [{ translateX: -40 }], zIndex: 10, justifyContent: 'center', alignItems: 'center' },
-  sproutImage: { width: 80, height: 80, resizeMode: 'contain', zIndex: 2 },
-  sproutGlow: { position: 'absolute', width: 50, height: 20, borderRadius: 25, backgroundColor: '#4CAF50', opacity: 0.5, bottom: 10, filter: 'blur(8px)' },
-
-  particle: { position: 'absolute', borderRadius: 50, backgroundColor: 'rgba(165, 214, 167, 0.4)', bottom: 0 },
-
-  // Nodes & Layout
   node: { position: 'absolute', zIndex: 20 },
   nodeLeft: { right: '50%', marginRight: 55 },
   nodeRight: { left: '50%', marginLeft: 55 },

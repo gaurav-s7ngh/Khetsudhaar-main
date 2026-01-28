@@ -5,9 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-// Use the @ alias for import
+import { useTranslation } from '@/hooks/useTranslation';
 import { supabase } from '@/utils/supabase';
-import { useTranslation } from '@/hooks/useTranslation'; // <-- ADDED
 
 function AppHeaderLeft() {
   const router = useRouter();
@@ -30,18 +29,11 @@ function AppHeaderRight() {
   );
 }
 
-// Custom component to use the hook inside Stack.Screen options
-function TranslatedHeaderTitle({ titleKey }: { titleKey: string }) {
-  const { t } = useTranslation();
-  return t(titleKey as any);
-}
-
 export default function AppLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const segments = useSegments();
-  // Initialize translation for the entire layout
   const { t, isLoading: isTransLoading } = useTranslation(); 
 
   useEffect(() => {
@@ -67,7 +59,6 @@ export default function AppLayout() {
 
     const currentRoute = segments[0] || 'index';
 
-    // --- PUBLIC ROUTES (Guest Access Allowed) ---
     const publicRoutes = [
       'index', 
       'language', 
@@ -81,16 +72,14 @@ export default function AppLayout() {
       'reward'
     ];
 
-    // Check if current route is in publicRoutes
     const isPublicRoute = publicRoutes.includes(currentRoute as string);
 
     if (session) {
-      // User IS logged in: Redirect them out of login/signup pages
-      if (currentRoute === 'login' || (currentRoute as string) === 'signup') {
-        router.replace('/lessons');
+      // FIX 1: Redirect to DASHBOARD, not Lessons, to establish it as the root
+      if (currentRoute === 'login' || (currentRoute as string) === 'signup' || currentRoute === 'index') {
+        router.replace('/dashboard');
       }
     } else {
-      // User is NOT logged in: Block protected pages
       if (!isPublicRoute) {
         router.replace('/login');
       }
@@ -116,29 +105,33 @@ export default function AppLayout() {
           headerTitleStyle: { fontWeight: 'bold' },
         }}>
         
-        {/* Public Screens - USING TRANSLATED HEADER */}
+        {/* Public Screens */}
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="language" options={{ headerShown: true, headerTitle: t('choose_language'), headerLeft: () => null, headerRight: () => <AppHeaderRight /> }} />
         <Stack.Screen name="crop" options={{ headerShown: true, headerTitle: t('choose_crop'), headerLeft: () => null, headerRight: () => <AppHeaderRight /> }} />
         <Stack.Screen name="login" options={{ headerShown: true, headerTitle: t('login'), headerLeft: () => null, headerRight: () => <AppHeaderRight /> }} />
         <Stack.Screen name="signup" options={{ headerShown: true, headerTitle: t('signup'), headerLeft: () => null, headerRight: () => <AppHeaderRight /> }} />
 
-        {/* Hybrid Screens */}
-        <Stack.Screen name="lessons" options={{ headerShown: true, headerTitle: t('lessons'), headerLeft: () => session ? <AppHeaderLeft /> : null, headerRight: () => <AppHeaderRight /> }} />
-        {/* Use a function component for dynamic title in the next two screens */}
-        <Stack.Screen name="lesson/[id]" options={{ headerShown: true, headerTitle: 'LESSON DETAIL', headerLeft: () => session ? <AppHeaderLeft /> : null, headerRight: () => <AppHeaderRight /> }} />
+        {/* FIX 2: REMOVE "headerLeft" from these sub-pages. 
+           This restores the native Back Arrow so users can swipe back to Dashboard.
+        */}
+        <Stack.Screen name="lessons" options={{ headerShown: true, headerTitle: t('lessons'), headerRight: () => <AppHeaderRight /> }} />
+        <Stack.Screen name="reward-root" options={{ headerShown: true, headerTitle: t('rewards_tree_title'), headerRight: () => <AppHeaderRight /> }} />
+        <Stack.Screen name="leaderboard" options={{ headerShown: true, headerTitle: t('leaderboard'), headerRight: () => <AppHeaderRight /> }} />
+        <Stack.Screen name="quests" options={{ headerShown: true, headerTitle: t('monthly_quests'), headerRight: () => <AppHeaderRight /> }} />
+        <Stack.Screen name="marketPrices" options={{ headerShown: true, headerTitle: t('market_prices'), headerRight: () => <AppHeaderRight /> }} />
+
+        {/* Lesson Flow */}
+        <Stack.Screen name="lesson/[id]" options={{ headerShown: true, headerTitle: 'LESSON DETAIL', headerRight: () => <AppHeaderRight /> }} />
         <Stack.Screen name="game/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="quiz/[id]" options={{ headerShown: true, headerTitle: t('take_quiz'), headerLeft: () => null, headerRight: () => <AppHeaderRight /> }} />
         <Stack.Screen name="complete/[id]" options={{ headerShown: true, headerTitle: t('completed'), headerLeft: () => null, headerRight: () => <AppHeaderRight /> }} />
         <Stack.Screen name="reward/[id]" options={{ headerShown: true, headerTitle: t('rewards'), headerLeft: () => null, headerRight: () => <AppHeaderRight /> }} />
 
-        {/* Protected Screens */}
+        {/* Protected Root Screens (Keep Profile Icon Here) */}
         <Stack.Screen name="dashboard" options={{ headerShown: true, headerTitle: t('dashboard'), headerLeft: () => <AppHeaderLeft />, headerRight: () => <AppHeaderRight /> }} />
         <Stack.Screen name="profile" options={{ headerShown: true, headerTitle: t('profile'), headerLeft: () => <AppHeaderLeft />, headerRight: () => <AppHeaderRight /> }} />
-        <Stack.Screen name="reward-root" options={{ headerShown: true, headerTitle: t('rewards_tree_title'), headerLeft: () => <AppHeaderLeft />, headerRight: () => <AppHeaderRight /> }} />
-        <Stack.Screen name="leaderboard" options={{ headerShown: true, headerTitle: t('leaderboard'), headerLeft: () => <AppHeaderLeft />, headerRight: () => <AppHeaderRight /> }} />
-        <Stack.Screen name="quests" options={{ headerShown: true, headerTitle: t('monthly_quests'), headerLeft: () => <AppHeaderLeft />, headerRight: () => <AppHeaderRight /> }} />
-        <Stack.Screen name="marketPrices" options={{ headerShown: true, headerTitle: t('market_prices'), headerLeft: () => <AppHeaderLeft />, headerRight: () => <AppHeaderRight /> }} />
+      
       </Stack>
       <StatusBar style="light" />
     </>
