@@ -1,59 +1,79 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useState } from 'react';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-export function useCachedQuery<T>(
-  key: string,
-  fetcher: () => Promise<T>
-) {
+export function useCachedQuery<T>(key: string, fetcher: () => Promise<T>) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+  // Ref to track if we have mounted (to avoid setting state on unmounted components)
+  const isMounted = useRef(true);
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
-    try {
-      // 1. Try Network Request
-      const result = await fetcher();
-      
-      // 2. If successful, save to Cache & Update State
-      await AsyncStorage.setItem(key, JSON.stringify(result));
-      setData(result);
-      setIsOffline(false);
-      
-    } catch (error) {
-      console.log(`[${key}] Network failed, trying cache...`);
-      
-      // 3. If failed, load from Cache
-      const cached = await AsyncStorage.getItem(key);
-      if (cached) {
-        setData(JSON.parse(cached));
-        setIsOffline(true);
+  const loadData = useCallback(
+    async (isRefresh = false) => {
+      if (isRefresh) {
+        setRefreshing(true);
       } else {
-        // 4. No cache and no internet?
-        if (!isRefresh && !data) {
-           console.log("No cached data available");
-        }
-        setIsOffline(true);
+        // Only show full loading spinner if we don't have data yet
+        if (!data) setLoading(true);
       }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [key]); // Dependency on 'key' ensures we fetch new data if key changes (e.g., language change)
 
-  // FIX: Run loadData whenever it changes (which happens when 'key' changes)
+      // 1. STRATEGY: Stale-While-Revalidate
+      // First, try to load from cache IMMEDIATELY to show something to the user
+      if (!isRefresh) {
+        try {
+          const cached = await AsyncStorage.getItem(key);
+          if (cached && isMounted.current) {
+            const parsed = JSON.parse(cached);
+            setData(parsed);
+            // If we found cache, we can stop the big loading spinner
+            // The network request will happen in the background
+            setLoading(false);
+          }
+        } catch (e) {
+          console.warn("Cache read error", e);
+        }
+      }
+
+      // 2. Then, try to fetch fresh data from the network
+      try {
+        const result = await fetcher();
+
+        if (isMounted.current) {
+          await AsyncStorage.setItem(key, JSON.stringify(result));
+          setData(result);
+          setIsOffline(false);
+          setLoading(false); // Ensure loading is off
+        }
+      } catch (error) {
+        console.log(`[${key}] Network request failed, using cache.`);
+        if (isMounted.current) {
+          setIsOffline(true);
+          setLoading(false);
+        }
+        // We don't need to load cache here because we already did it in step 1!
+      } finally {
+        if (isMounted.current) setRefreshing(false);
+      }
+    },
+    [key],
+  );
+
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  return { 
-    data, 
-    loading, 
-    isOffline, 
+  return {
+    data,
+    loading,
+    isOffline,
     refresh: () => loadData(true),
-    refreshing 
+    refreshing,
   };
 }

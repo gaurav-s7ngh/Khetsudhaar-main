@@ -29,7 +29,7 @@ const calculateScore = (coins: number, questCoins: number) => {
   return Math.floor(coins * multiplier);
 };
 
-const RankRow = ({ rank, name, score, isUser = false, multiplier }: any) => {
+const RankRow = ({ rank, name, score, coins, isUser = false, multiplier }: any) => {
   let cardStyle: StyleProp<ViewStyle> = styles.defaultCard;
   let numberStyle: StyleProp<ViewStyle> = styles.rankNumberContainer;
 
@@ -54,6 +54,7 @@ const RankRow = ({ rank, name, score, isUser = false, multiplier }: any) => {
       </View>
       <View style={{flex: 1}}>
         <Text style={styles.rankName}>{name || 'Anonymous'}</Text>
+        <Text style={styles.rankCoins}>{coins} Coins</Text>
         {multiplier > 1 && (
           <Text style={styles.rankMultiplier}>x{multiplier.toFixed(1)} Boost Active</Text>
         )}
@@ -74,47 +75,44 @@ export default function LeaderboardScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      // REPLACE your fetchLeaderboard function with this:
+      const fetchLeaderboard = async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const currentId = session?.user?.id;
 
-const fetchLeaderboard = async () => {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const currentId = session?.user?.id;
+          // FEAT: Fetch only the top 50 pre-calculated rows from the Database View
+          const { data, error } = await supabase
+            .from('leaderboard_view')
+            .select('*')
+            .limit(50);
 
-    // FEAT: Fetch only the top 50 pre-calculated rows from the Database View
-    // This is instant, even with 1 million users.
-    const { data, error } = await supabase
-      .from('leaderboard_view')
-      .select('*')
-      .limit(50);
+          if (error) throw error;
 
-    if (error) throw error;
+          setLeaders(data || []);
+          
+          // Find current user's rank efficiently
+          if (currentId) {
+            // If user is in top 50, find them there
+            let userEntry = data?.find(u => u.id === currentId);
+            
+            // If user is NOT in top 50, fetch just their specific row
+            if (!userEntry) {
+              const { data: userData } = await supabase
+                .from('leaderboard_view')
+                .select('*')
+                .eq('id', currentId)
+                .single();
+              userEntry = userData;
+            }
+            setCurrentUserData(userEntry);
+          }
 
-    setLeaders(data || []);
-    
-    // Find current user's rank efficiently
-    if (currentId) {
-      // If user is in top 50, find them there
-      let userEntry = data?.find(u => u.id === currentId);
-      
-      // If user is NOT in top 50, fetch just their specific row
-      if (!userEntry) {
-        const { data: userData } = await supabase
-          .from('leaderboard_view')
-          .select('*')
-          .eq('id', currentId)
-          .single();
-        userEntry = userData;
-      }
-      setCurrentUserData(userEntry);
-    }
-
-  } catch (err) {
-    console.error('Leaderboard error:', err);
-  } finally {
-    setLoading(false);
-  }
-};
+        } catch (err) {
+          console.error('Leaderboard error:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
       fetchLeaderboard();
     }, [])
   );
@@ -150,6 +148,7 @@ const fetchLeaderboard = async () => {
               rank={index + 1}
               name={user.full_name}
               score={user.finalScore}
+              coins={user.coins}
               multiplier={user.multiplier}
               isUser={user.id === currentUserData?.id}
             />
@@ -186,6 +185,7 @@ const styles = StyleSheet.create({
   rankNumber: { color: 'white', fontSize: 20, fontWeight: 'bold', fontFamily: PIXEL_FONT },
   rankName: { color: 'white', fontSize: 18, fontWeight: '500' },
   rankMultiplier: { color: '#B0B0B0', fontSize: 10, fontFamily: PIXEL_FONT, marginTop: 2 },
+  rankCoins: { color: '#FFD700', fontSize: 12, fontFamily: PIXEL_FONT, marginTop: 2 },
   scoreContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12 },
   rankScore: { color: 'white', fontSize: 16, fontWeight: 'bold', fontFamily: PIXEL_FONT, marginLeft: 6 },
 });

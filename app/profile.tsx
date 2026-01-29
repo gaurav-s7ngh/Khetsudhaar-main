@@ -35,7 +35,6 @@ import WinMascot from '../assets/images/winMascot.svg';
 
 const PIXEL_FONT = 'monospace';
 
-// --- HELPER: Base64 Decoder ---
 const decode = (base64: string) => {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -46,7 +45,7 @@ const decode = (base64: string) => {
   return bytes.buffer;
 };
 
-// --- 1. CUSTOM ANIMATED GAUGE ---
+// --- CUSTOM ANIMATED GAUGE ---
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 const SustainabilityGauge = ({ t, score }: { t: (key: any) => string, score: string }) => {
@@ -97,7 +96,7 @@ const SustainabilityGauge = ({ t, score }: { t: (key: any) => string, score: str
   );
 };
 
-// --- 2. STAT CARD ---
+// --- STAT CARD ---
 const StatCard = ({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) => (
   <View style={styles.statCard}>
     <View style={styles.statHeader}><Text style={styles.statLabel}>{label}</Text>{icon}</View>
@@ -105,7 +104,7 @@ const StatCard = ({ label, value, icon }: { label: string; value: string; icon: 
   </View>
 );
 
-// --- 3. XP BAR ---
+// --- XP BAR ---
 const XPBar = ({ current, max, level }: { current: number, max: number, level: number }) => {
   const widthPercent = Math.min((current / max) * 100, 100);
   return (
@@ -116,7 +115,6 @@ const XPBar = ({ current, max, level }: { current: number, max: number, level: n
   );
 };
 
-// --- MAIN SCREEN ---
 export default function ProfileScreen() {
   const router = useRouter();
   const { t, isLoading: isTransLoading } = useTranslation();
@@ -148,18 +146,15 @@ export default function ProfileScreen() {
     }, [])
   );
   
-  // --- REAL IMAGE UPLOAD LOGIC (RESTORED) ---
   const handleImageUpload = async () => {
     try {
       setUploading(true);
-
-      // 1. Pick Image
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.5,
-        base64: true, // Needed for upload
+        base64: true,
       });
 
       if (result.canceled || !result.assets || result.assets.length === 0) {
@@ -177,13 +172,12 @@ export default function ProfileScreen() {
       if (!session) return;
       const userId = session.user.id;
 
-      // 2. Upload to Supabase Storage
       const fileExt = image.uri.split('.').pop()?.toLowerCase() ?? 'jpeg';
       const fileName = `${userId}/avatar.${fileExt}`;
       const fileData = decode(image.base64);
 
       const { error: uploadError } = await supabase.storage
-        .from('avatars') // Ensure this bucket exists in Supabase!
+        .from('avatars')
         .upload(fileName, fileData, {
           contentType: image.mimeType ?? 'image/jpeg',
           upsert: true,
@@ -191,15 +185,9 @@ export default function ProfileScreen() {
 
       if (uploadError) throw uploadError;
 
-      // 3. Get Public URL
-      const { data: urlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
-
-      // Add timestamp to force UI refresh
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
       const publicUrl = `${urlData.publicUrl}?t=${new Date().getTime()}`;
 
-      // 4. Update Profile
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: publicUrl })
@@ -248,7 +236,6 @@ export default function ProfileScreen() {
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         
-        {/* HERO SECTION */}
         <View style={styles.heroSection}>
           <View style={styles.avatarWrapper}>
             <TouchableOpacity 
@@ -264,22 +251,21 @@ export default function ProfileScreen() {
                 <UserImage width={80} height={80} />
               )}
             </TouchableOpacity>
-            
-            <View style={styles.editBadge}>
-              <FontAwesome5 name="camera" size={12} color="#FFF" />
-            </View>
-
-            <View style={styles.levelBadge}>
-              <Text style={styles.levelBadgeText}>{level}</Text>
-            </View>
+            <View style={styles.editBadge}><FontAwesome5 name="camera" size={12} color="#FFF" /></View>
+            <View style={styles.levelBadge}><Text style={styles.levelBadgeText}>{level}</Text></View>
           </View>
           
-          <Text style={styles.userName}>{profile.full_name || 'FARMER'}</Text>
-          <Text style={styles.userTitle}>PRO {profile.selected_crop || 'FARMER'}</Text>
+          {/* --- RESTORED: Uses full_name as requested --- */}
+          <Text style={styles.userName}>
+            {(profile.full_name || profile.username || 'FARMER').toUpperCase()}
+          </Text>
+          
+          <Text style={styles.userTitle}>
+            PRO {(profile.selected_crop || 'FARMER').toUpperCase()}
+          </Text>
           <XPBar current={xpProgress} max={1000} level={level} />
         </View>
 
-        {/* STATS */}
         <View style={styles.gridContainer}>
           <StatCard label={t('wealth')} value={String(profile.coins || 0)} icon={<Coin width={20} height={20} />} />
           <StatCard label={t('multiplier')} value={`x${multiplier.toFixed(1)}`} icon={<Qcoin width={20} height={20} />} />
@@ -287,7 +273,6 @@ export default function ProfileScreen() {
           <StatCard label={t('land_size')} value={profile.land_size || 'N/A'} icon={<FarmIcon width={20} height={20} />} />
         </View>
 
-        {/* SUSTAINABILITY */}
         <View style={styles.section}>
           <Text style={styles.sectionHeader}>{t('sustainability_score')}</Text>
           <View style={styles.gaugeCard}>
@@ -296,7 +281,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ACHIEVEMENTS */}
         <View style={styles.section}>
           <Text style={styles.sectionHeader}>{t('recent_achievements')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.achievementsRow}>

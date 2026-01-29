@@ -13,6 +13,7 @@ export type TranslationKeys =
   | 'current_leaderboard_position'
   | 'available_coins'
   | 'unlocked'
+  | 'locked' // <--- ADDED THIS
   | 'rewards_tree'
   | 'username'
   | 'password'
@@ -22,6 +23,7 @@ export type TranslationKeys =
   | 'create_one'
   | 'dont_have_account'
   | 'already_have_account'
+  | 'login_here'
   | 'data_note'
   | 'take_quiz'
   | 'take_quiz_to_verify'
@@ -57,7 +59,6 @@ export type TranslationKeys =
   | 'claim_reward'
   | 'completed'
   | 'completed_lesson_title'
-  // --- NEW KEYS REQUIRED FOR OFFLINE & MARKET FEATURES ---
   | 'offline_mode'
   | 'save'
   | 'saving'
@@ -71,7 +72,6 @@ export type TranslationKeys =
   | 'no_data'
   | 'no_crops'
   | 'avg_mandi_price'
-  // --- MISSING KEYS FIXED ---
   | 'mission_complete'
   | 'great_job'
   | 'quest_complete';
@@ -79,7 +79,6 @@ export type TranslationKeys =
 // Define the structure of the translations
 type Translations = Record<TranslationKeys, string>;
 
-// Use the language code (id) stored in your Supabase profile table
 interface LanguageMap {
   [key: string]: Translations;
 }
@@ -100,6 +99,7 @@ const translations: LanguageMap = {
     current_leaderboard_position: 'CURRENT LEADERBOARD',
     available_coins: 'AVAILABLE COINS',
     unlocked: 'UNLOCKED',
+    locked: 'LOCKED', // <--- ADDED
     rewards_tree: 'REWARDS TREE',
     username: 'USERNAME',
     password: 'PASSWORD',
@@ -109,6 +109,7 @@ const translations: LanguageMap = {
     create_one: 'Create one',
     dont_have_account: "Don't have an account?",
     already_have_account: "Already have an account?",
+    login_here: "Login here",
     data_note: "DATA AS PER FARMER REGISTRY 2025",
     take_quiz: 'TAKE QUIZ',
     take_quiz_to_verify: 'TAKE QUIZ TO VERIFY',
@@ -177,6 +178,7 @@ const translations: LanguageMap = {
     current_leaderboard_position: 'वर्तमान लीडरबोर्ड',
     available_coins: 'उपलब्ध सिक्के',
     unlocked: 'अनलॉक किए गए',
+    locked: 'लॉक है', // <--- ADDED
     rewards_tree: 'पुरस्कार वृक्ष',
     username: 'उपयोगकर्ता नाम',
     password: 'पासवर्ड',
@@ -186,6 +188,7 @@ const translations: LanguageMap = {
     create_one: 'एक बनाओ',
     dont_have_account: "खाता नहीं है?",
     already_have_account: "पहले से ही खाता है?",
+    login_here: "यहाँ लॉगिन करें",
     data_note: "किसान रजिस्ट्री 2025 के अनुसार डेटा",
     take_quiz: 'क्विज लें',
     take_quiz_to_verify: 'पुष्टि के लिए क्विज लें',
@@ -254,6 +257,7 @@ const translations: LanguageMap = {
     current_leaderboard_position: 'HAZRI LEADERBOARD',
     available_coins: 'COINS',
     unlocked: 'UNLOCKED',
+    locked: 'LOCKED', // <--- ADDED
     rewards_tree: 'INAAM DA RUKH',
     username: 'USERNAME',
     password: 'PASSWORD',
@@ -263,6 +267,7 @@ const translations: LanguageMap = {
     create_one: 'Create one',
     dont_have_account: "Account nahi hai?",
     already_have_account: "Pehle hi account hai?",
+    login_here: "Ethe login karo",
     data_note: "KISAN REGISTRY 2025 DATA",
     take_quiz: 'QUIZ DAO',
     take_quiz_to_verify: 'CHECK LAYI QUIZ DAO',
@@ -331,6 +336,7 @@ const translations: LanguageMap = {
     current_leaderboard_position: 'റാങ്കിംഗ്',
     available_coins: 'കൈവശമുള്ള കോയിനുകൾ',
     unlocked: 'തുറന്നവ',
+    locked: 'LOCKED', // <--- ADDED
     rewards_tree: 'റിവാർഡ് ട്രീ',
     username: 'ഉപയോക്തൃനാമം',
     password: 'പാസ്‌വേഡ്',
@@ -340,6 +346,7 @@ const translations: LanguageMap = {
     create_one: 'പുതിയത് ഉണ്ടാക്കൂ',
     dont_have_account: "അക്കൗണ്ട് ഇല്ലേ?",
     already_have_account: "അക്കൗണ്ട് ഉണ്ടോ?",
+    login_here: "ഇവിടെ ലോഗിൻ ചെയ്യുക",
     data_note: "കർഷക രജിസ്ട്രി 2025 പ്രകാരം",
     take_quiz: 'ക്വിസ് എടുക്കുക',
     take_quiz_to_verify: 'പരിശോധിക്കാൻ ക്വിസ് എടുക്കുക',

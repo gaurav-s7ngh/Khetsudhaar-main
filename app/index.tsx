@@ -6,39 +6,27 @@ import { ActivityIndicator, View } from 'react-native';
 
 export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
-  const [nextScreen, setNextScreen] = useState<string>('/language');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [hasLanguage, setHasLanguage] = useState(false);
 
   useEffect(() => {
-    checkOnboardingStatus();
+    checkStatus();
   }, []);
 
-  const checkOnboardingStatus = async () => {
+  const checkStatus = async () => {
     try {
-      // 1. Check if user is already logged in (Skip everything)
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setNextScreen('/dashboard');
-        return;
-      }
-
-      // 2. Check Local Progress
-      const lang = await AsyncStorage.getItem('onboarding_lang');
-      const crop = await AsyncStorage.getItem('onboarding_crop');
-      const rewardClaimed = await AsyncStorage.getItem('onboarding_reward_claimed');
-
-      if (!lang) {
-        setNextScreen('/language'); // Step 1: User hasn't chosen language
-      } else if (!crop) {
-        setNextScreen('/crop');     // Step 2: User hasn't chosen crop
-      } else if (!rewardClaimed) {
-        // Step 3: Send to First Quest (ID 1)
-        // Ensure you have a quest with id=1 in your database!
-        setNextScreen('/quest-details?id=1'); 
+      // 1. Check Supabase Session (Are we logged in?)
+      const { data } = await supabase.auth.getSession();
+      
+      if (data.session) {
+        setIsLoggedIn(true);
       } else {
-        setNextScreen('/login');    // Step 4: Finished quest, needs to login
+        // 2. If NOT logged in, have we chosen a language before?
+        const lang = await AsyncStorage.getItem('user_language');
+        if (lang) setHasLanguage(true);
       }
     } catch (e) {
-      console.error("Onboarding check failed", e);
+      console.log(e);
     } finally {
       setIsLoading(false);
     }
@@ -52,6 +40,17 @@ export default function Index() {
     );
   }
 
-  // @ts-ignore
-  return <Redirect href={nextScreen} />;
+  // LOGIC:
+  // 1. Logged in? -> Dashboard (Skip everything)
+  if (isLoggedIn) {
+    return <Redirect href="/dashboard" />;
+  }
+
+  // 2. Not logged in, but selected language? -> Login Screen
+  if (hasLanguage) {
+    return <Redirect href="/login" />;
+  }
+
+  // 3. Brand new user? -> Language Selection
+  return <Redirect href="/language" />;
 }

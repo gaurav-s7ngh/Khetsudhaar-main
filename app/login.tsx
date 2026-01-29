@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'; // <--- Added
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -14,48 +15,61 @@ import {
   View
 } from 'react-native';
 
-import { supabase } from '@/utils/supabase';
 import { useTranslation } from '@/hooks/useTranslation';
+import { supabase } from '@/utils/supabase';
 import UserIcon from '../assets/images/user.svg';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { t, isLoading: isTransLoading } = useTranslation();
+  // Check if we came from completing a lesson
   const { lesson_completed } = useLocalSearchParams<{ lesson_completed?: string }>();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // --- EMAIL GENERATION (Must match Signup) ---
   const getEmailFromUsername = (usr: string) => {
     const cleanUser = usr.toLowerCase().replace(/[^a-z0-9]/g, '');
     return `${cleanUser}@khet.com`;
   };
 
-  // Handle Login
   const handleLogin = async () => {
     if (username.trim() !== '' && password.length >= 1 && !isLoading) {
       setIsLoading(true);
       
       const emailToLogin = getEmailFromUsername(username);
-      console.log("Logging in with:", emailToLogin); // Check terminal if this matches your dashboard
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: emailToLogin,
         password: password,
       });
 
-      setIsLoading(false);
-
       if (error) {
         Alert.alert('Login Failed', error.message);
+        setIsLoading(false);
       } else if (data.session) {
-        // Login Success
-        router.replace({
-            pathname: '/lessons',
-            params: { lesson_completed: lesson_completed }
-        });
+        
+        // --- SYNC PROGRESS LOGIC ---
+        // If the user just completed Lesson 1 as a guest, save it now!
+        if (lesson_completed) {
+            const lessonId = parseInt(lesson_completed);
+            const userId = data.session.user.id;
+            
+            await supabase.from('user_lessons').upsert({
+                user_id: userId,
+                lesson_id: lessonId,
+                completed_at: new Date().toISOString()
+            });
+
+            // Also mark onboarding as done locally
+            await AsyncStorage.setItem('onboarding_reward_claimed', 'true');
+        }
+        // ---------------------------
+
+        setIsLoading(false);
+        // Go to lessons to continue
+        router.replace('/lessons');
       }
     } else {
       Alert.alert('Invalid Input', 'Please enter your username and password.');
