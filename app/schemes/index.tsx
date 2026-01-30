@@ -1,5 +1,5 @@
 import { useTranslation } from "@/hooks/useTranslation";
-import { supabase } from "@/utils/supabase"; // Uses your main repo's utils
+import { supabase } from "@/utils/supabase";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -13,7 +13,6 @@ import {
     View,
 } from "react-native";
 
-// Define the interface locally since we removed the constants file
 interface Scheme {
   id: string;
   icon: string;
@@ -81,12 +80,7 @@ export default function SchemesListScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Stack.Screen
-        options={{
-          title: t("schemes_title") || "Govt Schemes",
-          headerBackTitle: "",
-        }}
-      />
+      <Stack.Screen options={{ title: t("schemes_title") || "Govt Schemes" }} />
 
       <View style={styles.header}>
         <Text style={styles.subHeader}>
@@ -95,7 +89,7 @@ export default function SchemesListScreen() {
       </View>
 
       {loading ? (
-        <View style={{ flex: 1, justifyContent: "center" }}>
+        <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4CAF50" />
         </View>
       ) : (
@@ -113,6 +107,7 @@ export default function SchemesListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#121212" },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: { padding: 20, paddingBottom: 10 },
   subHeader: {
     color: "#aaa",
