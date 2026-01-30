@@ -1,4 +1,4 @@
-import { FontAwesome5 } from "@expo/vector-icons"; // Ensure this is imported
+import { FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
@@ -28,23 +28,14 @@ import Reward from "../assets/images/Reward.svg";
 
 const PIXEL_FONT = "monospace";
 
-// --- TYPES ---
-interface QuestDetail {
+// 1. Define the shape of a Lesson from Supabase
+interface Lesson {
   id: number;
-  title: string;
-  description: string;
-}
-
-interface LessonDetail {
-  id: number;
-  title: string;
-  description: string;
   sequence: number;
-}
-
-interface ActiveQuestData {
-  status: string;
-  quest: QuestDetail | null;
+  title_en: string;
+  title_hi: string;
+  description_en: string;
+  description_hi: string;
 }
 
 type UserProgress = {
@@ -52,26 +43,25 @@ type UserProgress = {
   completed_lessons: number;
   user_coins: number;
   user_name: string;
-  active_quest: QuestDetail | null;
-  next_lesson: LessonDetail | null;
+  next_lesson: Lesson | null;
 };
 
-// --- DATA FETCHERS ---
+// --- DATA FETCHER ---
 const fetchUserProgress = async (): Promise<UserProgress> => {
   const { data: sessionData } = await supabase.auth.getSession();
   const userId = sessionData.session?.user.id;
 
-  if (!userId)
+  if (!userId) {
     return {
       total_lessons: 0,
       completed_lessons: 0,
       user_coins: 0,
       user_name: "FARMER",
-      active_quest: null,
       next_lesson: null,
     };
+  }
 
-  // 1. Profile
+  // A. Fetch User Profile
   const { data: profileData } = await supabase
     .from("profiles")
     .select("coins, full_name")
@@ -81,91 +71,38 @@ const fetchUserProgress = async (): Promise<UserProgress> => {
   const user_coins = profileData?.coins || 0;
   const user_name = profileData?.full_name || "FARMER";
 
-  // 2. Lessons Counts & Next Lesson Logic
-  const { count: total_lessons } = await supabase
+  // B. Fetch All Lessons
+  const { data: allLessons, error: lessonError } = await supabase
     .from("lessons")
-    .select("*", { count: "exact", head: true });
+    .select("id, sequence, title_en, title_hi, description_en, description_hi")
+    .order("sequence", { ascending: true });
 
+  if (lessonError) console.error("Error fetching lessons:", lessonError);
+
+  const lessons = allLessons || [];
+  const total_lessons = lessons.length;
+
+  // C. Fetch Completed Lessons
   const { data: userLessons } = await supabase
     .from("user_lessons")
     .select("lesson_id")
     .eq("user_id", userId);
 
-  const completedIds = userLessons?.map((ul) => ul.lesson_id) || [];
-  const completed_lessons = completedIds.length;
+  const completedIds = new Set(userLessons?.map((ul) => ul.lesson_id) || []);
+  const completed_lessons = completedIds.size;
 
-  let nextLessonData: LessonDetail | null = null;
-  let maxSeq = 0;
-
-  if (completedIds.length > 0) {
-    const { data: completedSeqsData } = await supabase
-      .from("lessons")
-      .select("sequence")
-      .in("id", completedIds);
-
-    if (completedSeqsData) {
-      maxSeq = completedSeqsData.reduce(
-        (max, current) => Math.max(max, current.sequence),
-        0,
-      );
-    }
-  }
-
-  const { data: next } = await supabase
-    .from("lessons")
-    .select("id, title_en, description_en, sequence")
-    .gt("sequence", maxSeq)
-    .order("sequence", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (next) {
-    nextLessonData = {
-      id: next.id,
-      title: next.title_en || "Next Lesson",
-      description: next.description_en || "Continue your journey.",
-      sequence: next.sequence,
-    };
-  } else if (completed_lessons === 0) {
-    const { data: first } = await supabase
-      .from("lessons")
-      .select("id, title_en, description_en, sequence")
-      .eq("sequence", 1)
-      .maybeSingle();
-
-    if (first) {
-      nextLessonData = {
-        id: first.id,
-        title: first.title_en,
-        description: first.description_en,
-        sequence: first.sequence,
-      };
-    }
-  }
-
-  // 3. Active Quest
-  let active_quest: QuestDetail | null = null;
-  const { data: userQuests } = (await supabase
-    .from("user_quests")
-    .select("status, quest:quests(id, title, description)")) as {
-    data: ActiveQuestData[] | null;
-  };
-
-  if (userQuests && userQuests.length > 0) {
-    active_quest = userQuests[0].quest;
-  }
+  // D. Find the Next Lesson
+  const nextLessonData = lessons.find((l) => !completedIds.has(l.id)) || null;
 
   return {
-    total_lessons: total_lessons || 0,
-    completed_lessons: completed_lessons || 0,
+    total_lessons,
+    completed_lessons,
     user_coins,
     user_name,
-    active_quest,
     next_lesson: nextLessonData,
   };
 };
 
-// --- COMPONENTS ---
 const Header = ({ coins, name }: { coins: number; name: string }) => (
   <View style={styles.header}>
     <View>
@@ -188,17 +125,17 @@ const HubButton = ({ icon, label, onPress, style, textStyle }: any) => (
   </TouchableOpacity>
 );
 
-// --- MAIN SCREEN ---
 export default function DashboardScreen() {
   const router = useRouter();
-  const { t, isLoading: isTransLoading } = useTranslation();
+  const { t, language, isLoading: isTransLoading } = useTranslation();
+  const isHindi = language === "hi";
 
   const {
     data: progressData,
     loading: progressLoading,
     refresh: refreshProgress,
     refreshing,
-  } = useCachedQuery(`dashboard_progress_v4`, fetchUserProgress);
+  } = useCachedQuery(`dashboard_progress_fixed`, fetchUserProgress);
 
   const handleRefresh = async () => {
     await refreshProgress();
@@ -215,11 +152,21 @@ export default function DashboardScreen() {
   const completed = progressData?.completed_lessons || 0;
   const total = progressData?.total_lessons || 0;
   const nextLesson = progressData?.next_lesson;
-  const activeQuest = progressData?.active_quest;
   const coins = progressData?.user_coins || 0;
   const userName = progressData?.user_name || "FARMER";
 
   const progressPercent = total > 0 ? (completed / total) * 100 : 0;
+
+  const lessonTitle = nextLesson
+    ? isHindi
+      ? nextLesson.title_hi
+      : nextLesson.title_en
+    : "";
+  const lessonDesc = nextLesson
+    ? isHindi
+      ? nextLesson.description_hi
+      : nextLesson.description_en
+    : "";
 
   return (
     <SafeAreaView style={styles.container}>
@@ -237,7 +184,6 @@ export default function DashboardScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* HERO CARD */}
         <View style={styles.heroContainer}>
           <MascotFarmer width={110} height={110} style={styles.mascot} />
 
@@ -252,54 +198,43 @@ export default function DashboardScreen() {
               }
             >
               <View style={[styles.heroBadge, { backgroundColor: "#388e3c" }]}>
-                <Text style={styles.heroBadgeText}>CONTINUE LEARNING</Text>
+                <Text style={styles.heroBadgeText}>
+                  {t("continue_learning") || "CONTINUE LEARNING"}
+                </Text>
               </View>
               <View style={styles.heroContent}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.heroTitle}>
-                    LESSON {nextLesson.sequence}
+                    {t("lessons") || "LESSON"} {nextLesson.sequence}
                   </Text>
                   <Text style={styles.heroDesc} numberOfLines={2}>
-                    {nextLesson.title}
+                    {lessonTitle}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.heroDesc,
+                      { fontSize: 10, marginTop: 4, opacity: 0.8 },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {lessonDesc}
                   </Text>
                 </View>
                 <Lessons width={40} height={40} />
               </View>
             </TouchableOpacity>
-          ) : activeQuest ? (
-            <TouchableOpacity
-              style={[styles.heroCard, styles.questCard]}
-              onPress={() =>
-                router.push({
-                  pathname: "/quest-details",
-                  params: { id: activeQuest.id.toString() },
-                })
-              }
-            >
-              <View style={styles.heroBadge}>
-                <Text style={styles.heroBadgeText}>ACTIVE MISSION</Text>
-              </View>
-              <View style={styles.heroContent}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.heroTitle}>{activeQuest.title}</Text>
-                  <Text style={styles.heroDesc} numberOfLines={2}>
-                    {activeQuest.description}
-                  </Text>
-                </View>
-                <Quest width={40} height={40} />
-              </View>
-            </TouchableOpacity>
           ) : (
             <View style={[styles.heroCard, { backgroundColor: "#333" }]}>
-              <Text style={styles.heroTitle}>ALL CAUGHT UP!</Text>
+              <Text style={styles.heroTitle}>
+                {t("completed_lesson_title") || "ALL CAUGHT UP!"}
+              </Text>
               <Text style={styles.heroDesc}>
-                You have completed all lessons.
+                {t("great_job") || "You have completed all available lessons."}
               </Text>
             </View>
           )}
         </View>
 
-        {/* PROGRESS BAR */}
         <View style={styles.progressSection}>
           <View style={styles.progressBg}>
             <View
@@ -307,11 +242,10 @@ export default function DashboardScreen() {
             />
           </View>
           <Text style={styles.progressText}>
-            {completed} / {total} LESSONS COMPLETED
+            {completed} / {total} {t("lessons") || "LESSONS COMPLETED"}
           </Text>
         </View>
 
-        {/* HUB GRID */}
         <View style={styles.gridContainer}>
           <View style={styles.gridRow}>
             <HubButton
@@ -330,7 +264,6 @@ export default function DashboardScreen() {
             />
           </View>
 
-          {/* --- MISSING BUTTON ADDED HERE --- */}
           <View style={styles.gridRow}>
             <HubButton
               label={t("schemes_title") || "Govt Schemes"}
@@ -339,7 +272,7 @@ export default function DashboardScreen() {
               style={[
                 styles.buttonRect,
                 {
-                  backgroundColor: "rgba(33, 150, 243, 0.3)", // Blue background
+                  backgroundColor: "rgba(33, 150, 243, 0.3)",
                   borderColor: "#2196F3",
                 },
               ]}
@@ -395,7 +328,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -433,9 +365,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontFamily: PIXEL_FONT,
   },
-
   scrollContainer: { paddingHorizontal: 20, paddingBottom: 50 },
-
   heroContainer: { marginBottom: 20, marginTop: 10 },
   mascot: { position: "absolute", right: 10, top: -25, zIndex: 10 },
   heroCard: {
@@ -449,17 +379,11 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 5,
   },
-  questCard: {
-    backgroundColor: "#2E1A47",
-    borderColor: "#7B1FA2",
-    shadowColor: "#7B1FA2",
-  },
   lessonHeroCard: {
     backgroundColor: "#1B3E20",
     borderColor: "#388E3C",
     shadowColor: "#388E3C",
   },
-
   heroBadge: {
     alignSelf: "flex-start",
     paddingHorizontal: 8,
@@ -488,7 +412,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   heroDesc: { color: "#CCC", fontSize: 12 },
-
   progressSection: { marginBottom: 20 },
   progressBg: {
     height: 8,
@@ -504,14 +427,12 @@ const styles = StyleSheet.create({
     fontFamily: PIXEL_FONT,
     textAlign: "center",
   },
-
   gridContainer: { width: "100%" },
   gridRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 16,
   },
-
   buttonBase: {
     borderRadius: 20,
     borderWidth: 1,
@@ -527,12 +448,10 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     paddingLeft: 30,
   },
-
   iconContainer: { marginBottom: 10 },
   buttonText: { color: "white", fontWeight: "bold", fontFamily: PIXEL_FONT },
   squareButtonText: { fontSize: 14, textAlign: "center", marginTop: 5 },
   rectButtonText: { fontSize: 18, marginLeft: 20 },
-
   questsButton: {
     backgroundColor: "rgba(74, 20, 140, 0.4)",
     borderColor: "#7B1FA2",

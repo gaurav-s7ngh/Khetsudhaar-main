@@ -1,10 +1,9 @@
+import { GOV_SCHEMES } from "@/constants/schemes";
 import { useTranslation } from "@/hooks/useTranslation";
-import { supabase } from "@/utils/supabase";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
-    ActivityIndicator,
     FlatList,
     SafeAreaView,
     StyleSheet,
@@ -13,44 +12,12 @@ import {
     View,
 } from "react-native";
 
-interface Scheme {
-  id: string;
-  icon: string;
-  color: string;
-  title_en: string;
-  title_hi: string;
-  desc_en: string;
-  desc_hi: string;
-}
-
 export default function SchemesListScreen() {
   const router = useRouter();
   const { t, language } = useTranslation();
   const isHindi = language === "hi";
 
-  const [schemes, setSchemes] = useState<Scheme[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchSchemes();
-  }, []);
-
-  const fetchSchemes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("gov_schemes")
-        .select("id, icon, color, title_en, title_hi, desc_en, desc_hi");
-
-      if (error) throw error;
-      if (data) setSchemes(data);
-    } catch (err) {
-      console.error("Error fetching schemes:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const renderItem = ({ item }: { item: Scheme }) => (
+  const renderItem = ({ item }: { item: (typeof GOV_SCHEMES)[0] }) => (
     <TouchableOpacity
       style={[styles.card, { borderLeftColor: item.color }]}
       onPress={() =>
@@ -59,7 +26,7 @@ export default function SchemesListScreen() {
       activeOpacity={0.8}
     >
       <View style={[styles.iconBox, { backgroundColor: item.color }]}>
-        <FontAwesome5 name={item.icon as any} size={24} color="white" />
+        <FontAwesome5 name={item.icon} size={24} color="white" />
       </View>
       <View style={styles.cardContent}>
         <Text style={styles.cardTitle}>
@@ -70,7 +37,7 @@ export default function SchemesListScreen() {
         </Text>
         <View style={styles.ctaRow}>
           <Text style={[styles.ctaText, { color: item.color }]}>
-            {t("view_details") || "View Details"}
+            {t("view_details")}
           </Text>
           <FontAwesome5 name="arrow-right" size={12} color={item.color} />
         </View>
@@ -80,34 +47,25 @@ export default function SchemesListScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Stack.Screen options={{ title: t("schemes_title") || "Govt Schemes" }} />
+      <Stack.Screen options={{ title: t("schemes_title") }} />
 
       <View style={styles.header}>
-        <Text style={styles.subHeader}>
-          {t("schemes_subtitle") || "Empowering Farmers"}
-        </Text>
+        <Text style={styles.subHeader}>{t("schemes_subtitle")}</Text>
       </View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
-        </View>
-      ) : (
-        <FlatList
-          data={schemes}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+      <FlatList
+        data={GOV_SCHEMES}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#121212" },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: { padding: 20, paddingBottom: 10 },
   subHeader: {
     color: "#aaa",

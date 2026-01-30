@@ -1,15 +1,9 @@
+import { GOV_SCHEMES } from "@/constants/schemes";
 import { useTranslation } from "@/hooks/useTranslation";
-import { supabase } from "@/utils/supabase";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
-import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
-} from "react-native";
+import React from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 const InfoSection = ({ title, icon, color, items }: any) => {
   if (!items || items.length === 0) return null;
@@ -38,60 +32,13 @@ export default function SchemeDetailScreen() {
   const { t, language } = useTranslation();
   const isHindi = language === "hi";
 
-  const [scheme, setScheme] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const scheme = GOV_SCHEMES.find((s) => s.id === id);
 
-  useEffect(() => {
-    const fetchDetails = async () => {
-      if (!id) return;
-      console.log("Fetching details for ID:", id); // Debugging Log
-
-      try {
-        const { data, error } = await supabase
-          .from("gov_schemes")
-          .select("*")
-          .eq("id", id)
-          .maybeSingle(); // <--- CRITICAL FIX: Prevents crash if ID is not found
-
-        if (error) throw error;
-        setScheme(data);
-      } catch (err) {
-        console.error("Error fetching details:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDetails();
-  }, [id]);
-
-  if (loading) {
-    return (
-      <View style={[styles.container, styles.center]}>
-        <Stack.Screen options={{ title: "", headerBackTitle: "" }} />
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
-  }
-
-  // Handle "Not Found" State Gracefully
   if (!scheme) {
     return (
-      <View style={[styles.container, styles.center]}>
-        <Stack.Screen options={{ title: "Not Found", headerBackTitle: "" }} />
-        <FontAwesome5 name="exclamation-circle" size={50} color="#666" />
-        <Text
-          style={{
-            color: "white",
-            textAlign: "center",
-            marginTop: 20,
-            fontSize: 16,
-          }}
-        >
-          Scheme details not found.
-        </Text>
-        <Text style={{ color: "#888", textAlign: "center", marginTop: 10 }}>
-          ID: {id}
+      <View style={styles.container}>
+        <Text style={{ color: "white", textAlign: "center", marginTop: 50 }}>
+          Scheme not found
         </Text>
       </View>
     );
@@ -102,13 +49,12 @@ export default function SchemeDetailScreen() {
 
   return (
     <View style={styles.container}>
+      {/* FIXED: Removed headerBackTitleVisible, added headerBackTitle: "" */}
       <Stack.Screen
-        options={{
-          title: t("schemes_title") || "Scheme Details",
-          headerBackTitle: "",
-        }}
+        options={{ title: t("schemes_title"), headerBackTitle: "" }}
       />
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Hero Section */}
         <View
           style={[
             styles.hero,
@@ -122,22 +68,25 @@ export default function SchemeDetailScreen() {
           <Text style={styles.heroDesc}>{desc}</Text>
         </View>
 
+        {/* Benefits */}
         <InfoSection
-          title={t("benefits") || "Benefits"}
+          title={t("benefits")}
           icon="gift"
           color="#4CAF50"
           items={isHindi ? scheme.benefits_hi : scheme.benefits_en}
         />
 
+        {/* Eligibility */}
         <InfoSection
-          title={t("eligibility") || "Eligibility"}
+          title={t("eligibility")}
           icon="user-check"
           color="#2196F3"
           items={isHindi ? scheme.eligibility_hi : scheme.eligibility_en}
         />
 
+        {/* Process (How to Apply) */}
         <InfoSection
-          title={t("process") || "Process"}
+          title={t("process")}
           icon="walking"
           color="#9C27B0"
           items={isHindi ? scheme.steps_hi : scheme.steps_en}
@@ -149,7 +98,6 @@ export default function SchemeDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#121212" },
-  center: { justifyContent: "center", alignItems: "center" },
   scrollContent: { padding: 20, paddingBottom: 50 },
   hero: {
     alignItems: "center",
@@ -180,6 +128,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
+
   sectionContainer: { marginBottom: 20 },
   sectionHeader: {
     flexDirection: "row",
@@ -195,6 +144,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   sectionTitle: { fontSize: 16, fontWeight: "bold", letterSpacing: 1 },
+
   card: { backgroundColor: "#1E1E1E", borderRadius: 12, padding: 16 },
   listItem: { flexDirection: "row", marginBottom: 12 },
   bullet: {
