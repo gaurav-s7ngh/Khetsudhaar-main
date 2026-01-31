@@ -5,7 +5,6 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -32,20 +31,43 @@ import { useCachedQuery } from "@/hooks/useCachedQuery";
 import { useTranslation } from "@/hooks/useTranslation";
 import { supabase } from "@/utils/supabase";
 
-// Assets
 import SusScoreIcon from "../assets/images/SusScore.svg";
 import UserIcon from "../assets/images/UserImage.svg";
 
 const PIXEL_FONT = "monospace";
-const { width } = Dimensions.get("window");
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
-// --- GAUGE COMPONENT (From Teammate's Code) ---
+// --- MOCK DATABASE (For Demo) ---
+const MOCK_DB: Record<string, any> = {
+  "AGRI-001": {
+    landSize: "2.5 Hectares",
+    location: "Punjab, India",
+    soilType: "Alluvial Soil",
+    primaryCrop: "Rice",
+    status: "Active",
+  },
+  "AGRI-002": {
+    landSize: "5.0 Acres",
+    location: "Kerala, India",
+    soilType: "Laterite Soil",
+    primaryCrop: "Banana",
+    status: "Active",
+  },
+  "AGRI-003": {
+    landSize: "1.2 Hectares",
+    location: "Coorg, Karnataka",
+    soilType: "Red Loam",
+    primaryCrop: "Coffee",
+    status: "Active",
+  },
+};
+
+// --- GAUGE COMPONENT ---
 const Gauge = ({ score }: { score: number }) => {
   const radius = 80;
   const strokeWidth = 15;
   const center = radius + strokeWidth;
-  const circumference = Math.PI * radius; // Half circle
+  const circumference = Math.PI * radius;
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -60,12 +82,8 @@ const Gauge = ({ score }: { score: number }) => {
     return { strokeDashoffset };
   });
 
-  // Color logic based on score
-  const getColor = (s: number) => {
-    if (s < 40) return "#FF5252"; // Red
-    if (s < 70) return "#FFD740"; // Yellow
-    return "#4CAF50"; // Green
-  };
+  const getColor = (s: number) =>
+    s < 40 ? "#FF5252" : s < 70 ? "#FFD740" : "#4CAF50";
   const scoreColor = getColor(score);
 
   return (
@@ -80,7 +98,6 @@ const Gauge = ({ score }: { score: number }) => {
             <Stop offset="1" stopColor="#4CAF50" stopOpacity="1" />
           </LinearGradient>
         </Defs>
-        {/* Background Track */}
         <Path
           d={`M${strokeWidth},${center} A${radius},${radius} 0 0,1 ${center * 2 - strokeWidth},${center}`}
           stroke="#333"
@@ -88,7 +105,6 @@ const Gauge = ({ score }: { score: number }) => {
           fill="none"
           strokeLinecap="round"
         />
-        {/* Progress Arc */}
         <AnimatedPath
           d={`M${strokeWidth},${center} A${radius},${radius} 0 0,1 ${center * 2 - strokeWidth},${center}`}
           stroke="url(#grad)"
@@ -99,7 +115,6 @@ const Gauge = ({ score }: { score: number }) => {
           animatedProps={animatedProps}
         />
       </Svg>
-      {/* Score Text in Center */}
       <View style={{ position: "absolute", top: 50, alignItems: "center" }}>
         <Text
           style={{
@@ -134,7 +149,10 @@ export default function ProfileScreen() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isLinked, setIsLinked] = useState(false);
 
-  // --- FETCHER WITH SCORING LOGIC ---
+  // FIX: Added missing state variable
+  const [fetchedData, setFetchedData] = useState<any>(null);
+
+  // --- FETCH PROFILE & CALCULATE SCORE ---
   const fetchProfileAndScore = async () => {
     const { data: session } = await supabase.auth.getSession();
     const userId = session.session?.user.id;
@@ -146,8 +164,9 @@ export default function ProfileScreen() {
       .select("*")
       .eq("id", userId)
       .single();
+    const userCrop = profile?.selected_crop;
 
-    // 2. Calculate Lessons Score (60% Weight)
+    // 2. Lessons Score (60%)
     const { count: totalLessons } = await supabase
       .from("lessons")
       .select("*", { count: "exact", head: true });
@@ -155,24 +174,33 @@ export default function ProfileScreen() {
       .from("user_lessons")
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId);
-
     const lessonsScore = totalLessons
       ? (completedLessons || 0) / totalLessons
       : 0;
 
-    // 3. Calculate Quests Score (40% Weight)
-    const { count: totalQuests } = await supabase
+    // 3. Quests Score (40%)
+    let questQuery = supabase
       .from("quests")
       .select("*", { count: "exact", head: true });
+
+    if (userCrop) {
+      questQuery = questQuery.or(
+        `target_crop.is.null,target_crop.eq.${userCrop}`,
+      );
+    } else {
+      questQuery = questQuery.is("target_crop", null);
+    }
+
+    const { count: totalQuests } = await questQuery;
     const { count: completedQuests } = await supabase
       .from("user_quests")
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId);
 
-    const questsScore = totalQuests ? (completedQuests || 0) / totalQuests : 0;
+    const questsScore =
+      totalQuests && totalQuests > 0 ? (completedQuests || 0) / totalQuests : 0;
 
     // 4. Weighted Formula
-    // Logic: (Lessons% * 0.6) + (Quests% * 0.4)
     const finalScore = Math.round(
       lessonsScore * 100 * 0.6 + questsScore * 100 * 0.4,
     );
@@ -188,15 +216,33 @@ export default function ProfileScreen() {
     data: profile,
     refresh,
     refreshing,
-  } = useCachedQuery("profile_w_score_v1", fetchProfileAndScore);
+  } = useCachedQuery("profile_fixed_v4", fetchProfileAndScore);
 
   const handleVerifyAgriStack = () => {
-    if (!agriStackId.trim()) return Alert.alert("Error", "Enter Valid ID");
+    const id = agriStackId.trim().toUpperCase();
+
+    if (!id) return Alert.alert("Error", "Enter Valid ID");
+
     setIsVerifying(true);
+
     setTimeout(() => {
       setIsVerifying(false);
-      setIsLinked(true);
-      Alert.alert("Success", "AgriStack Linked! Land records fetched.");
+
+      if (MOCK_DB[id]) {
+        setIsLinked(true);
+        setFetchedData(MOCK_DB[id]);
+        Alert.alert("Success", "AgriStack Verified! Records Fetched.");
+      } else {
+        setIsLinked(true);
+        setFetchedData({
+          landSize: "Unknown Area",
+          location: "Registered Farm",
+          soilType: "Standard Soil",
+          primaryCrop: "Mixed",
+          status: "Pending Verification",
+        });
+        Alert.alert("Notice", "ID Linked, but data is limited.");
+      }
     }, 1500);
   };
 
@@ -213,7 +259,7 @@ export default function ProfileScreen() {
           />
         }
       >
-        {/* --- 1. USER CARD --- */}
+        {/* User Card */}
         <View style={styles.userCard}>
           <View style={styles.avatarContainer}>
             <UserIcon width={70} height={70} />
@@ -233,7 +279,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* --- 2. SUSTAINABILITY SCORE (INTEGRATED) --- */}
+        {/* Sustainability Score */}
         <Text style={styles.sectionLabel}>PERFORMANCE</Text>
         <View style={styles.scoreCard}>
           <View style={styles.scoreHeader}>
@@ -245,15 +291,10 @@ export default function ProfileScreen() {
             </View>
             <FontAwesome5 name="info-circle" size={14} color="#666" />
           </View>
-
-          {/* The Gauge */}
           <Gauge score={profile?.sustainabilityScore || 0} />
-
           <Text style={styles.scoreDesc}>
             Based on 60% Learning + 40% Field Tasks
           </Text>
-
-          {/* Mini Stats */}
           <View style={styles.miniStatsRow}>
             <View style={styles.miniStat}>
               <Text style={styles.miniVal}>
@@ -273,7 +314,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* --- 3. AGRISTACK STATUS --- */}
+        {/* AgriStack */}
         <Text style={styles.sectionLabel}>GOVERNMENT ID</Text>
         <View style={styles.sectionCard}>
           <View style={styles.rowBetween}>
@@ -308,11 +349,31 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          {!isLinked && (
+          {/* If Linked, Show Data */}
+          {isLinked && fetchedData ? (
+            <View
+              style={{
+                marginTop: 15,
+                padding: 10,
+                backgroundColor: "rgba(76, 175, 80, 0.1)",
+                borderRadius: 10,
+              }}
+            >
+              <Text style={{ color: "#DDD", fontSize: 12 }}>
+                Land: {fetchedData.landSize}
+              </Text>
+              <Text style={{ color: "#DDD", fontSize: 12 }}>
+                Soil: {fetchedData.soilType}
+              </Text>
+              <Text style={{ color: "#DDD", fontSize: 12 }}>
+                Crop: {fetchedData.primaryCrop}
+              </Text>
+            </View>
+          ) : (
             <View style={styles.linkInputContainer}>
               <TextInput
                 style={styles.input}
-                placeholder="Enter Farmer ID (e.g. AGRI-2025)"
+                placeholder="Enter Farmer ID"
                 placeholderTextColor="#555"
                 value={agriStackId}
                 onChangeText={setAgriStackId}
@@ -332,12 +393,14 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* --- 4. SETTINGS MENU --- */}
+        {/* Settings Menu */}
         <Text style={styles.sectionLabel}>PREFERENCES</Text>
         <View style={styles.menuContainer}>
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => router.push("/crop")}
+            onPress={() =>
+              router.push({ pathname: "/crop", params: { source: "profile" } })
+            }
           >
             <View style={[styles.menuIcon, { backgroundColor: "#E3F2FD" }]}>
               <FontAwesome5 name="leaf" size={14} color="#2196F3" />
@@ -348,7 +411,10 @@ export default function ProfileScreen() {
             <FontAwesome5 name="chevron-right" size={12} color="#666" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push("/language")}
+          >
             <View style={[styles.menuIcon, { backgroundColor: "#F3E5F5" }]}>
               <FontAwesome5 name="language" size={14} color="#9C27B0" />
             </View>
@@ -368,7 +434,6 @@ export default function ProfileScreen() {
         >
           <Text style={styles.logoutText}>{t("logout") || "Log Out"}</Text>
         </TouchableOpacity>
-
         <Text style={styles.version}>KhetSudhaar v1.0.0 (Beta)</Text>
       </ScrollView>
     </SafeAreaView>
@@ -378,8 +443,6 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#121212" },
   scrollContent: { padding: 20 },
-
-  // User Card
   userCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -408,7 +471,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   roleText: { color: "white", fontSize: 10, fontWeight: "bold" },
-
   sectionLabel: {
     color: "#666",
     fontSize: 12,
@@ -417,8 +479,6 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     letterSpacing: 1,
   },
-
-  // Score Card
   scoreCard: {
     backgroundColor: "#1E1E1E",
     borderRadius: 20,
@@ -434,6 +494,7 @@ const styles = StyleSheet.create({
     width: "100%",
     marginBottom: 10,
   },
+  cardTitle: { color: "white", fontSize: 16, fontWeight: "500" },
   scoreDesc: { color: "#888", fontSize: 10, marginTop: -10, marginBottom: 15 },
   miniStatsRow: {
     flexDirection: "row",
@@ -453,8 +514,6 @@ const styles = StyleSheet.create({
   },
   miniLabel: { color: "#666", fontSize: 10, marginTop: 2 },
   verticalLine: { width: 1, backgroundColor: "#333", height: "80%" },
-
-  // Generic Cards
   sectionCard: {
     backgroundColor: "#1E1E1E",
     borderRadius: 16,
@@ -475,8 +534,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  cardTitle: { color: "white", fontSize: 16, fontWeight: "500" },
-
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -487,7 +544,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusText: { color: "white", fontSize: 10, fontWeight: "bold" },
-
   linkInputContainer: { marginTop: 15, flexDirection: "row", gap: 10 },
   input: {
     flex: 1,
@@ -507,8 +563,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   linkBtnText: { color: "white", fontWeight: "bold", fontSize: 12 },
-
-  // Menu
   menuContainer: {
     backgroundColor: "#1E1E1E",
     borderRadius: 16,
@@ -533,7 +587,6 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   menuText: { flex: 1, color: "#DDD", fontSize: 14, fontWeight: "500" },
-
   logoutButton: {
     backgroundColor: "rgba(244, 67, 54, 0.1)",
     padding: 16,
@@ -543,6 +596,5 @@ const styles = StyleSheet.create({
     borderColor: "rgba(244, 67, 54, 0.3)",
   },
   logoutText: { color: "#EF5350", fontWeight: "bold", fontSize: 14 },
-
   version: { textAlign: "center", color: "#444", fontSize: 10, marginTop: 20 },
 });
