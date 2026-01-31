@@ -1,10 +1,7 @@
-import { useTranslation } from '@/hooks/useTranslation';
-import { supabase } from '@/utils/supabase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { FontAwesome5 } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router"; // <--- IMPORT useLocalSearchParams
+import React, { useState } from "react";
 import {
-  ActivityIndicator,
   Image,
   SafeAreaView,
   ScrollView,
@@ -12,142 +9,219 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 
-// --- 1. STATIC FALLBACK DATA ---
-// This ensures the screen is never empty, even if DB is empty/offline.
-const DEFAULT_CROPS = [
-  { id: 'coffee', name: 'COFFEE' },
-  { id: 'coconut', name: 'COCONUT' },
-  { id: 'rice', name: 'RICE' },
-  { id: 'banana', name: 'BANANA' },
-  { id: 'cardamom', name: 'CARDAMOM' },
-  { id: 'black_pepper', name: 'BLACK PEPPER' },
-  { id: 'ginger', name: 'GINGER' },
-  { id: 'cashew', name: 'CASHEW' },
-];
+import { useTranslation } from "@/hooks/useTranslation";
+import { supabase } from "@/utils/supabase";
 
-// --- 2. IMAGE MAPPING ---
-// Maps IDs to local assets (Required because React Native can't dynamic require)
-const CROP_IMAGES: { [key: string]: any } = {
-  banana: require('../assets/images/crops/banana.png'),
-  coffee: require('../assets/images/crops/coffee.png'),
-  coconut: require('../assets/images/crops/coconut.png'),
-  rice: require('../assets/images/crops/rice.png'),
-  cardamom: require('../assets/images/crops/cardamom.png'),
-  black_pepper: require('../assets/images/crops/black_pepper.png'),
-  ginger: require('../assets/images/crops/ginger.png'),
-  cashew: require('../assets/images/crops/cashew.png'),
+// Static assets map
+const cropImages: { [key: string]: any } = {
+  coffee: require("../assets/images/crops/coffee.png"),
+  coconut: require("../assets/images/crops/coconut.png"),
+  rice: require("../assets/images/crops/rice.png"),
+  banana: require("../assets/images/crops/banana.png"),
+  cardamom: require("../assets/images/crops/cardamom.png"),
+  black_pepper: require("../assets/images/crops/black_pepper.png"),
+  ginger: require("../assets/images/crops/ginger.png"),
+  cashew: require("../assets/images/crops/cashew.png"),
 };
 
-export default function CropScreen() {
-  // Start with DEFAULT_CROPS so UI renders immediately
-  const [crops, setCrops] = useState<any[]>(DEFAULT_CROPS);
-  const [selectedCrop, setSelectedCrop] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false); // Set false initially so we see defaults
+export default function CropSelectionScreen() {
   const router = useRouter();
-  const { t, isLoading: isTransLoading } = useTranslation(); 
+  const { source } = useLocalSearchParams(); // <--- READ THE FLAG
+  const { t } = useTranslation();
+  const [selectedCrop, setSelectedCrop] = useState<string | null>(null);
+  // Find the 'crops' array and remove the Wheat entry:
 
-  useEffect(() => {
-    const fetchCrops = async () => {
-      try {
-        // Try to fetch dynamic list
-        const { data, error } = await supabase.from('crops').select('*').order('name');
-        
-        // Only update if we actually got data back
-        if (data && data.length > 0) {
-          setCrops(data);
-        }
-      } catch (err) {
-        console.log("Using default crops list");
+  const crops = [
+    { id: "rice", name: "Rice (Paddy)" },
+    // { id: 'wheat', name: 'Wheat' }, <--- REMOVED THIS
+    { id: "banana", name: "Banana" }, // Kept this
+    { id: "coffee", name: "Coffee" },
+    { id: "coconut", name: "Coconut" },
+    { id: "cardamom", name: "Cardamom" },
+    { id: "black_pepper", name: "Black Pepper" },
+    { id: "ginger", name: "Ginger" },
+    { id: "cashew", name: "Cashew" },
+  ];
+
+  const handleConfirm = async () => {
+    if (!selectedCrop) return;
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+
+      if (userId) {
+        // Save to Supabase profile
+        await supabase
+          .from("profiles")
+          .update({ selected_crop: selectedCrop })
+          .eq("id", userId);
       }
-    };
-    fetchCrops();
-  }, []);
 
-  const handleConfirm = async () => { 
-    if (selectedCrop) {
-      try {
-        // 1. Save locally
-        await AsyncStorage.setItem('onboarding_crop', selectedCrop);
-
-        // 2. Save to DB if logged in
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          await supabase.from('profiles').update({ selected_crop: selectedCrop }).eq('id', session.user.id);
-        }
-
-        // 3. Navigate to Lesson 1
-        router.replace({ pathname: '/lesson/[id]', params: { id: '1' } }); 
-
-      } catch (error) {
-        console.error('Error saving crop:', error);
+      // --- SMART NAVIGATION LOGIC ---
+      if (source === "profile") {
+        // Existing user editing profile -> Go to Dashboard
+        router.replace("/dashboard");
+      } else {
+        // New user onboarding -> Go to Lesson 1
+        router.replace({ pathname: "/lesson/[id]", params: { id: "1" } });
       }
+    } catch (error) {
+      console.error("Error saving crop:", error);
     }
   };
 
-  if (isTransLoading) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#388e3c" /></View>
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>{t('choose_crop')}</Text>
-        <Text style={styles.subtitle}>{t('choose_your_crop_in_hindi')}</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>{t("choose_crop")}</Text>
+        <Text style={styles.subtitle}>Select what you grow</Text>
+      </View>
 
-        <View style={styles.gridContainer}>
-          {crops.map((crop) => (
+      <ScrollView contentContainerStyle={styles.grid}>
+        {crops.map((crop) => {
+          const isSelected = selectedCrop === crop.id;
+          return (
             <TouchableOpacity
               key={crop.id}
-              style={[
-                styles.cropButton,
-                selectedCrop === crop.id && styles.cropButtonSelected,
-              ]}
-              onPress={() => setSelectedCrop(crop.id)}>
-              {/* Fallback to banana if ID doesn't match a known image */}
-              <Image 
-                source={CROP_IMAGES[crop.id] || CROP_IMAGES['banana']} 
-                style={styles.cropImage} 
-              />
-              <Text style={styles.cropName}>{crop.name}</Text>
+              style={[styles.card, isSelected && styles.cardSelected]}
+              onPress={() => setSelectedCrop(crop.id)}
+              activeOpacity={0.8}
+            >
+              <View
+                style={[
+                  styles.imageContainer,
+                  isSelected && styles.imageContainerSelected,
+                ]}
+              >
+                {cropImages[crop.id] ? (
+                  <Image
+                    source={cropImages[crop.id]}
+                    style={styles.image}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <FontAwesome5
+                    name="seedling"
+                    size={32}
+                    color={isSelected ? "#4CAF50" : "#888"}
+                  />
+                )}
+              </View>
+              <Text
+                style={[styles.cropName, isSelected && styles.cropNameSelected]}
+              >
+                {crop.name}
+              </Text>
+              {isSelected && (
+                <View style={styles.checkBadge}>
+                  <FontAwesome5 name="check" size={10} color="white" />
+                </View>
+              )}
             </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={{ flex: 1 }} />
-
-        <TouchableOpacity
-          style={[
-            styles.confirmButton,
-            selectedCrop ? styles.confirmButtonActive : styles.confirmButtonDisabled,
-          ]}
-          disabled={!selectedCrop}
-          onPress={handleConfirm}>
-          <Text style={styles.confirmButtonText}>{t('confirm')}</Text>
-        </TouchableOpacity>
+          );
+        })}
       </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={[styles.button, !selectedCrop && styles.buttonDisabled]}
+          disabled={!selectedCrop}
+          onPress={handleConfirm}
+        >
+          <Text style={styles.buttonText}>{t("confirm")}</Text>
+          <FontAwesome5 name="arrow-right" size={16} color="white" />
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#151718' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#151718' },
-  container: { flexGrow: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 30, paddingBottom: 30 },
-  title: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', textAlign: 'center' },
-  subtitle: { color: '#B0B0B0', fontSize: 18, textAlign: 'center', marginBottom: 20 },
-  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', width: '100%', maxWidth: 400 },
-  cropButton: { width: '48%', backgroundColor: '#333333', borderRadius: 15, padding: 10, alignItems: 'center', marginBottom: 15, borderWidth: 2, borderColor: '#333333' },
-  cropButtonSelected: { borderColor: '#388e3c' },
-  cropImage: { width: 100, height: 100, marginBottom: 10, resizeMode: 'contain' },
-  cropName: { color: '#FFFFFF', fontSize: 16, fontWeight: '500', textAlign: 'center' },
-  confirmButton: { width: '100%', maxWidth: 400, paddingVertical: 16, borderRadius: 30, marginTop: 20 },
-  confirmButtonDisabled: { backgroundColor: '#555555' },
-  confirmButtonActive: { backgroundColor: '#388e3c' },
-  confirmButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', textAlign: 'center' },
+  container: { flex: 1, backgroundColor: "#121212" },
+  header: { padding: 24, paddingTop: 40 },
+  title: {
+    fontSize: 28,
+    color: "white",
+    fontWeight: "bold",
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  subtitle: { fontSize: 16, color: "#888" },
+  grid: {
+    padding: 16,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    paddingBottom: 100,
+  },
+  card: {
+    width: "48%",
+    backgroundColor: "#1E1E1E",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  cardSelected: { borderColor: "#4CAF50", backgroundColor: "#1E251E" },
+  imageContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#2C2C2E",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  imageContainerSelected: { backgroundColor: "white" },
+  image: { width: 50, height: 50 },
+  cropName: {
+    color: "#888",
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  cropNameSelected: { color: "white" },
+  checkBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "#4CAF50",
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  footer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 24,
+    backgroundColor: "#121212",
+    borderTopWidth: 1,
+    borderTopColor: "#333",
+  },
+  button: {
+    backgroundColor: "#4CAF50",
+    borderRadius: 16,
+    paddingVertical: 18,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+    elevation: 4,
+  },
+  buttonDisabled: { backgroundColor: "#333", opacity: 0.7 },
+  buttonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+    letterSpacing: 1,
+  },
 });
